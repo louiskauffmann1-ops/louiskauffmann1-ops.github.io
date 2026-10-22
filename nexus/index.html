@@ -573,7 +573,7 @@ const MODULES = [
   { id: "chronos", nom: "CHRONOS", epithete: "maître du temps · agenda", rendu: vueChronos },
   { id: "ploutos", nom: "PLOUTOS", epithete: "gardien des richesses · budget", rendu: vuePloutos },
   { id: "pheme", nom: "PHÉMÈ", epithete: "voix du monde · actualité", rendu: vuePheme },
-  { id: "ares", nom: "ARÈS", epithete: "force · entraînement", rendu: vueAres, bientot: true },
+  { id: "ares", nom: "ARÈS", epithete: "force · entraînement", rendu: vueAres },
 ];
 let courant = "nexus";
 
@@ -586,8 +586,8 @@ function construireRail() {
     const badge = m.id === "hermes" ? donnees.hermes.taches.filter((t) => t.retard).length : 0;
     if (badge) anneau.append(el("span", { class: "badge", title: badge + " tâche(s) en retard" }, String(badge)));
     rail.append(el("button", {
-      class: "onglet" + (m.bientot ? " bientot" : ""), type: "button", style: `--c:var(--${m.id})`,
-      "aria-current": m.id === courant ? "page" : null, title: m.nom + (m.bientot ? " (bientôt)" : ""),
+      class: "onglet" + (m.id === "ares" && !(donnees.ares && !donnees.ares.erreur) ? " bientot" : ""), type: "button", style: `--c:var(--${m.id})`,
+      "aria-current": m.id === courant ? "page" : null, title: m.nom,
       onclick: () => aller(m.id),
     }, anneau, el("span", { class: "nom" }, m.nom)));
   }
@@ -856,16 +856,60 @@ function vuePheme(d) {
       pannes.length ? el("p", { class: "secondaire", style: "margin-top:12px" }, "Indisponible au dernier passage : " + pannes.join(", ") + ".") : null)));
 }
 
-/* --- ARÈS : prévu, pas encore branché --- */
-function vueAres() {
-  return el("div", { class: "grille" },
-    el("div", { class: "s4" }, panneau("Semaine", el("span", { class: "meta" }, "EN ATTENTE"), "",
-      el("div", { class: "jauges" },
-        jauge({ valeur: 0, max: 4, texte: "–", lib: "Séances", unite: "OBJECTIF" }),
-        jauge({ valeur: 0, max: 1, texte: "–", lib: "Volume", unite: "TONNES" })))),
-    el("div", { class: "s8" }, panneau("Module entraînement", el("span", { class: "meta" }, "BIENTÔT"), "",
+/* --- ARÈS : entraînements (Hevy) --- */
+const kg = (n) => Math.round(n).toLocaleString("fr-FR");
+function courbe(points) {
+  const w = 120, h = 32, min = Math.min(...points), max = Math.max(...points), etendue = max - min || 1;
+  const xy = points.map((p, i) => [points.length > 1 ? i / (points.length - 1) * w : w, h - 4 - (p - min) / etendue * (h - 8)]);
+  const g = s("svg", { viewBox: `-4 0 ${w + 8} ${h}`, style: "width:120px;height:32px;overflow:visible", "aria-hidden": "true" });
+  g.append(s("path", { d: "M" + xy.map(([x, y]) => x.toFixed(1) + " " + y.toFixed(1)).join("L") + `L${w} ${h}L0 ${h}Z`, fill: "color-mix(in srgb, var(--m) 14%, transparent)" }));
+  g.append(s("path", { d: "M" + xy.map(([x, y]) => x.toFixed(1) + " " + y.toFixed(1)).join("L"), fill: "none", stroke: "var(--m)", "stroke-width": 1.5 }));
+  const [lx, ly] = xy[xy.length - 1];
+  g.append(s("circle", { cx: lx, cy: ly, r: 3, fill: "var(--m)" }));
+  return g;
+}
+function histogramme(semaines, objectif) {
+  const w = 560, h = 190, bas = 160, max = Math.max(1, ...semaines.map((x) => x.volume));
+  const g = s("svg", { viewBox: `0 0 ${w} ${h}`, style: "width:100%;height:auto;display:block", role: "img", "aria-label": "Volume et séances des 8 dernières semaines" });
+  for (const f of [0.5, 1]) g.append(s("line", { x1: 0, x2: w, y1: bas - f * 130, y2: bas - f * 130, stroke: "rgba(127,152,171,.15)", "stroke-dasharray": "3 4" }));
+  g.append(s("text", { x: 0, y: bas - 134, style: "font:400 10px var(--mono);fill:var(--doux)" }, kg(max) + " kg"));
+  const pas = w / semaines.length;
+  semaines.forEach((x, i) => {
+    const hb = x.volume / max * 130, cx = i * pas + pas / 2, derniere = i === semaines.length - 1;
+    g.append(s("rect", { x: cx - pas * .28, y: bas - hb, width: pas * .56, height: Math.max(hb, 1), fill: derniere ? "var(--m)" : "color-mix(in srgb, var(--m) 45%, transparent)" }, s("title", null, `${x.seances} séance(s), ${kg(x.volume)} kg`)));
+    for (let k = 0; k < objectif; k++) g.append(s("rect", { x: cx - 13 + k * (26 / objectif), y: bas + 8, width: 26 / objectif - 2, height: 5, fill: k < x.seances ? "var(--m)" : "rgba(127,152,171,.22)" }));
+    const l = new Date(x.lundi + "T12:00:00Z");
+    g.append(s("text", { x: cx, y: bas + 26, "text-anchor": "middle", style: "font:400 10px var(--mono);fill:" + (derniere ? "var(--m)" : "var(--doux)") }, derniere ? "CETTE SEM." : l.getUTCDate() + "/" + (l.getUTCMonth() + 1)));
+  });
+  return g;
+}
+function vueAres(d) {
+  const a = d.ares;
+  if (!a || a.erreur) return el("div", { class: "grille" },
+    el("div", { class: "s12" }, panneau("Module entraînement", el("span", { class: "meta" }, a ? "HEVY INDISPONIBLE" : "EN ATTENTE"), "",
       el("div", { class: "hors-ligne" }, el("canvas", { "data-brouillage": "" }),
-        el("div", { class: "msg" }, el("b", null, "MODULE NON CONNECTÉ"), el("span", null, "Séances, volume, records et progression par exercice s'afficheront ici une fois tes entraînements reliés."))))));
+        el("div", { class: "msg" }, el("b", null, a ? "LIAISON INTERROMPUE" : "MODULE NON CONNECTÉ"),
+          el("span", null, a ? "Hevy n'a pas répondu au dernier passage. Vérifie que ta clé Hevy est toujours valable." : "Ajoute ta clé Hevy (secret HEVY_API_KEY) pour voir tes séances, ton volume et tes records."))))));
+  const sem = a.semaine, maxVol = Math.max(1, ...a.semaines.map((x) => x.volume));
+  const ilYaJours = a.derniere_seance ? -joursEntre(a.derniere_seance) : null;
+  return el("div", { class: "grille" },
+    el("div", { class: "s4" }, panneau("Cette semaine", el("span", { class: "meta" }, ilYaJours == null ? "" : ilYaJours === 0 ? "SÉANCE AUJOURD'HUI" : "DERNIÈRE IL Y A " + ilYaJours + " J"), "",
+      el("div", { class: "jauges" },
+        jauge({ valeur: sem.seances, max: a.objectif, texte: sem.seances + "/" + a.objectif, lib: "Séances", unite: "OBJECTIF" }),
+        jauge({ valeur: sem.volume, max: maxVol, texte: (sem.volume / 1000).toFixed(1).replace(".", ","), lib: "Volume", unite: "TONNES" }),
+        jauge({ valeur: sem.minutes, max: 60 * a.objectif, texte: (sem.minutes / 60).toFixed(1).replace(".", ","), lib: "Durée", unite: "HEURES" }),
+        jauge({ valeur: a.semaines.filter((x) => x.seances >= a.objectif).length, max: a.semaines.length, lib: "Régularité", unite: "SEM. AU BUT" })))),
+    el("div", { class: "s8" }, panneau("8 dernières semaines", el("span", { class: "meta" }, "VOLUME · SÉANCES"), "", histogramme(a.semaines, a.objectif))),
+    el("div", { class: "s7" }, panneau("Records estimés", el("span", { class: "meta" }, "1RM · FORMULE D'EPLEY"), "",
+      liste(a.records, "Pas encore assez de séances.", (r) => el("div", { class: "rangee", style: "grid-template-columns:minmax(0,1fr) auto auto" },
+        el("span", { class: "principal" }, r.exercice, el("span", { class: "secondaire" }, "dernière : " + r.derniere.charge + " kg × " + r.derniere.reps)),
+        courbe(r.points),
+        el("span", { class: "echeance", style: "text-align:right" }, el("span", { style: "font:700 18px var(--titre)" }, String(r.record).replace(".", ",") + " kg"),
+          el("span", { class: "temps", style: "color:" + (r.progression > 0 ? "var(--ploutos)" : r.progression < 0 ? "var(--alerte)" : "var(--doux)") }, (r.progression > 0 ? "+" : "") + String(r.progression).replace(".", ",") + " kg")))))),
+    el("div", { class: "s5" }, panneau("Dernières séances", el("span", { class: "compte" }, String(a.dernieres.length)), "",
+      liste(a.dernieres, "Aucune séance.", (x) => el("div", { class: "rangee" }, el("span", { class: "losange plein" }),
+        el("span", { class: "principal" }, x.titre, el("span", { class: "secondaire" }, x.exercices.join(" · "))),
+        el("span", { class: "temps" }, quand(x.date), el("br"), x.minutes + " min · " + kg(x.volume) + " kg"))))));
 }
 
 /* ---------- Démarrage ---------- */
@@ -875,7 +919,7 @@ async function sequenceDemarrage() {
   try { deja = sessionStorage.getItem("nexus-demarre") === "1"; sessionStorage.setItem("nexus-demarre", "1"); } catch {}
   if (CALME || deja) return;
   const lignes = ["> NEXUS // OLYMPE", "> déchiffrement ............ OK", "> HERMÈS ................... EN LIGNE",
-    "> CHRONOS .................. EN LIGNE", "> PHÉMÈ .................... EN LIGNE", "> PLOUTOS .................. VEILLE", "> bienvenue, " + donnees.prenom.toLowerCase()];
+    "> CHRONOS .................. EN LIGNE", "> PHÉMÈ .................... EN LIGNE", "> PLOUTOS .................. VEILLE", "> ARÈS ..................... " + (donnees.ares && !donnees.ares.erreur ? "EN LIGNE" : "NON CONNECTÉ"), "> bienvenue, " + donnees.prenom.toLowerCase()];
   const ecran = $("demarrage"), pre = $("journal-demarrage");
   ecran.hidden = false;
   for (const l of lignes) { pre.textContent += l + "\n"; await new Promise((r) => setTimeout(r, 140)); }
