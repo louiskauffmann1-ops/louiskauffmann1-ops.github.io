@@ -1,0 +1,498 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#04070c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="NEXUS">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icone.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icone-192.png">
+<!-- PAGE -->
+<title>NEXUS</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Orbitron:wght@500;700&display=swap">
+<style>
+/* Mise en page : une console de bord. Bandeau d'état en haut, réacteur et briefing,
+   puis les trois modules (HERMÈS, CHRONOS, PLOUTOS) en grille qui passe en colonne sur téléphone.
+   Un seul univers visuel, sombre, voulu ainsi. */
+:root {
+  --fond: #04070c;
+  --panneau: #0a121c;
+  --ligne: #16324a;
+  --texte: #d6e7f2;
+  --doux: #7d97ab;
+  --cyan: #5fd4ff;
+  --cyan-faible: rgba(95, 212, 255, .12);
+  --ambre: #ffb547;
+  --rouge: #ff6474;
+  --vert: #6fe3b0;
+  --titre: "Orbitron", "Chakra Petch", "Segoe UI", sans-serif;
+  --corps: "Chakra Petch", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { min-height: 100%; }
+body {
+  margin: 0;
+  background: var(--fond);
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(95, 212, 255, .10), transparent 70%),
+    linear-gradient(rgba(95, 212, 255, .035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(95, 212, 255, .035) 1px, transparent 1px);
+  background-size: auto, 32px 32px, 32px 32px;
+  color: var(--texte);
+  font: 500 16px/1.5 var(--corps);
+  -webkit-font-smoothing: antialiased;
+}
+body::before {
+  content: ""; position: fixed; inset: 0 0 auto; z-index: 10;
+  height: env(safe-area-inset-top, 0px); background: var(--fond);
+}
+.cadre {
+  max-width: 1120px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 48px;
+}
+button, input { font: inherit; color: inherit; }
+a { color: inherit; }
+:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+
+/* Bandeau d'état */
+.bandeau {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 12px 0; margin-bottom: 8px;
+  background: linear-gradient(var(--fond) 70%, transparent);
+}
+.marque { font: 700 15px/1 var(--titre); letter-spacing: .32em; color: var(--cyan); }
+.etat { display: flex; align-items: center; gap: 8px; font: 400 12px/1 var(--mono); color: var(--doux); }
+.voyant { width: 7px; height: 7px; border-radius: 50%; background: var(--vert); box-shadow: 0 0 8px var(--vert); }
+.voyant.vieux { background: var(--ambre); box-shadow: 0 0 8px var(--ambre); }
+.actions { margin-left: auto; display: flex; gap: 8px; }
+.bouton {
+  border: 1px solid var(--ligne); background: var(--panneau); border-radius: 4px;
+  padding: 6px 12px; font-size: 13px; letter-spacing: .06em; cursor: pointer;
+}
+.bouton:hover { border-color: var(--cyan); color: var(--cyan); }
+
+/* Réacteur et briefing */
+.accueil {
+  display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 28px; align-items: center;
+  padding: 16px 0 28px;
+}
+.reacteur { width: 180px; height: 180px; max-width: 100%; position: relative; }
+.reacteur canvas { width: 100%; height: 100%; display: block; }
+.reacteur .heure {
+  position: absolute; inset: 0; display: grid; place-content: center; text-align: center;
+  font: 700 26px/1 var(--titre); color: var(--texte); letter-spacing: .04em;
+}
+.reacteur .heure small { display: block; margin-top: 6px; font: 400 11px/1 var(--mono); color: var(--doux); letter-spacing: .1em; }
+.salut { margin: 0; font: 500 clamp(24px, 4.5vw, 36px)/1.15 var(--titre); letter-spacing: .02em; text-wrap: balance; }
+.date { margin: 6px 0 14px; color: var(--doux); font-size: 15px; }
+.date::first-letter { text-transform: uppercase; }
+.bref { margin: 0; max-width: 62ch; font-size: 18px; line-height: 1.5; }
+.bref-source { margin-top: 6px; font: 400 12px/1.4 var(--mono); color: var(--doux); }
+.priorites { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 8px; }
+.priorites li { display: flex; gap: 12px; align-items: baseline; }
+.priorites li span:first-child { font: 500 12px/1 var(--mono); color: var(--cyan); }
+
+/* Alerte */
+.alerte {
+  border: 1px solid rgba(255, 181, 71, .45); background: rgba(255, 181, 71, .07);
+  border-radius: 6px; padding: 12px 16px; margin-bottom: 20px;
+}
+.alerte h2 { color: var(--ambre); }
+.alerte ul { margin: 6px 0 0; padding-left: 18px; }
+
+/* Modules */
+.modules { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: start; }
+.module {
+  min-width: 0; background: var(--panneau); border: 1px solid var(--ligne); border-radius: 6px;
+  padding: 16px; position: relative;
+}
+.module::before, .module::after {
+  content: ""; position: absolute; width: 12px; height: 12px; border: 2px solid var(--cyan); opacity: .7;
+}
+.module::before { top: -1px; left: -1px; border-right: 0; border-bottom: 0; border-top-left-radius: 6px; }
+.module::after { bottom: -1px; right: -1px; border-left: 0; border-top: 0; border-bottom-right-radius: 6px; }
+.module.large { grid-column: span 2; }
+.entete { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+h2 { margin: 0; font: 700 14px/1.2 var(--titre); letter-spacing: .22em; color: var(--cyan); }
+.role { font: 400 12px/1 var(--mono); color: var(--doux); }
+h3 {
+  margin: 18px 0 8px; font: 600 12px/1 var(--corps); letter-spacing: .14em; text-transform: uppercase; color: var(--doux);
+  display: flex; gap: 8px; align-items: center;
+}
+h3 .compte { font-family: var(--mono); color: var(--cyan); letter-spacing: 0; }
+.liste { list-style: none; margin: 0; padding: 0; display: grid; }
+.liste li { border-top: 1px solid var(--ligne); }
+.liste li:first-child { border-top: 0; }
+.ligne {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: baseline;
+  padding: 9px 0; text-decoration: none;
+}
+a.ligne:hover .principal { color: var(--cyan); }
+.principal { overflow-wrap: anywhere; }
+.secondaire { display: block; font-size: 13px; color: var(--doux); overflow-wrap: anywhere; }
+.temps { font: 400 12px/1.4 var(--mono); color: var(--doux); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.puce { width: 8px; height: 8px; border-radius: 50%; border: 1px solid var(--doux); align-self: center; }
+.puce.plein { background: var(--cyan); border-color: var(--cyan); box-shadow: 0 0 6px var(--cyan); }
+.case { width: 12px; height: 12px; border: 1.5px solid var(--cyan); border-radius: 2px; align-self: center; }
+.pastille {
+  display: inline-block; margin: 2px 6px 0 0; padding: 1px 7px; border-radius: 3px;
+  font-size: 11px; letter-spacing: .04em; background: var(--cyan-faible); color: var(--cyan);
+}
+.pastille.retard { background: rgba(255, 100, 116, .14); color: var(--rouge); }
+.pastille.urgent { background: rgba(255, 181, 71, .14); color: var(--ambre); }
+.vide { padding: 8px 0; color: var(--doux); font-size: 14px; }
+.chiffre { font: 700 34px/1 var(--titre); color: var(--texte); }
+.note { font-size: 14px; color: var(--doux); margin: 8px 0 0; }
+.colonnes { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 24px; }
+.horaire { font: 500 12px/1.4 var(--mono); color: var(--cyan); white-space: nowrap; font-variant-numeric: tabular-nums; min-width: 84px; }
+
+/* Écran verrouillé */
+.verrou { min-height: 80vh; display: grid; place-items: center; text-align: center; }
+.verrou form { display: grid; gap: 14px; justify-items: center; width: min(340px, 100%); }
+.verrou .marque { font-size: 22px; }
+.verrou input {
+  width: 100%; padding: 12px 14px; border-radius: 4px; border: 1px solid var(--ligne);
+  background: var(--panneau); font-family: var(--mono); font-size: 16px;
+}
+.verrou input:focus { border-color: var(--cyan); outline: none; box-shadow: 0 0 0 3px var(--cyan-faible); }
+.verrou .bouton { width: 100%; padding: 12px; background: var(--cyan); color: var(--fond); border-color: var(--cyan); font-weight: 600; }
+.verrou .bouton:hover { color: var(--fond); filter: brightness(1.1); }
+.message { min-height: 1.5em; font-size: 14px; color: var(--doux); }
+.message.erreur { color: var(--rouge); }
+
+@media (max-width: 860px) {
+  .modules { grid-template-columns: minmax(0, 1fr); }
+  .module.large { grid-column: auto; }
+}
+@media (max-width: 560px) {
+  .accueil { grid-template-columns: minmax(0, 1fr); justify-items: center; text-align: center; gap: 12px; }
+  .reacteur { width: 150px; height: 150px; }
+  .priorites { justify-items: start; text-align: left; }
+  .colonnes { grid-template-columns: minmax(0, 1fr); }
+  .etat .texte-long { display: none; }
+}
+</style>
+</head>
+<body>
+<div class="cadre">
+  <section class="verrou" id="verrou" hidden>
+    <form id="formulaire">
+      <div class="reacteur" style="width:120px;height:120px"><canvas id="reacteur-verrou"></canvas></div>
+      <div class="marque">NEXUS</div>
+      <label for="mdp" class="message" style="color:var(--doux)">Accès réservé. Tape ton mot de passe.</label>
+      <input id="mdp" type="password" autocomplete="current-password" required>
+      <button class="bouton" type="submit">Déverrouiller</button>
+      <div class="message" id="message-verrou" role="status"></div>
+    </form>
+  </section>
+
+  <main id="console" hidden>
+    <header class="bandeau">
+      <span class="marque">NEXUS</span>
+      <span class="etat"><span class="voyant" id="voyant"></span><span id="maj"></span></span>
+      <span class="actions">
+        <button class="bouton" id="rafraichir" type="button">Actualiser</button>
+        <button class="bouton" id="verrouiller" type="button">Verrouiller</button>
+      </span>
+    </header>
+
+    <section class="accueil">
+      <div class="reacteur"><canvas id="reacteur"></canvas><div class="heure"><span id="horloge">--:--</span><small>PARIS</small></div></div>
+      <div>
+        <h1 class="salut" id="salut"></h1>
+        <p class="date" id="date"></p>
+        <p class="bref" id="bref"></p>
+        <div class="bref-source" id="bref-source"></div>
+        <ol class="priorites" id="priorites"></ol>
+      </div>
+    </section>
+
+    <section class="alerte" id="alerte" hidden>
+      <h2>ATTENTION</h2>
+      <ul id="attention"></ul>
+    </section>
+
+    <div class="modules">
+      <section class="module large" aria-labelledby="t-hermes">
+        <div class="entete"><h2 id="t-hermes">HERMÈS</h2><span class="role">mails et tâches</span></div>
+        <div class="colonnes">
+          <div>
+            <h3>À traiter <span class="compte" id="nb-taches"></span></h3>
+            <ul class="liste" id="taches"></ul>
+          </div>
+          <div>
+            <h3>Boîte de réception <span class="compte" id="nb-non-lus"></span></h3>
+            <ul class="liste" id="mails"></ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="module" aria-labelledby="t-chronos">
+        <div class="entete"><h2 id="t-chronos">CHRONOS</h2><span class="role">agenda</span></div>
+        <h3>Aujourd'hui <span class="compte" id="charge"></span></h3>
+        <ul class="liste" id="agenda"></ul>
+        <h3>7 prochains jours</h3>
+        <ul class="liste" id="bientot"></ul>
+      </section>
+
+      <section class="module" aria-labelledby="t-ploutos">
+        <div class="entete"><h2 id="t-ploutos">PLOUTOS</h2><span class="role">budget</span></div>
+        <h3>Prochain point budget</h3>
+        <div class="chiffre" id="point-budget"></div>
+        <p class="note" id="budget-note"></p>
+      </section>
+
+      <section class="module large" aria-labelledby="t-briefing">
+        <div class="entete"><h2 id="t-briefing">BRIEFING</h2><span class="role" id="briefing-date"></span></div>
+        <ul class="liste" id="briefing-mails"></ul>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const FUSEAU = "Europe/Paris";
+const DEMO = window.NEXUS_DEMO || null;
+let cle = null;
+
+/* ---------- Clé gardée sur l'appareil (non exportable, dans IndexedDB) ---------- */
+function base() {
+  return new Promise((ok, ko) => {
+    const r = indexedDB.open("nexus", 1);
+    r.onupgradeneeded = () => r.result.createObjectStore("cles");
+    r.onsuccess = () => ok(r.result);
+    r.onerror = () => ko(r.error);
+  });
+}
+async function lireCle(sel) {
+  try {
+    const db = await base();
+    return await new Promise((ok) => {
+      const r = db.transaction("cles").objectStore("cles").get(sel);
+      r.onsuccess = () => ok(r.result || null);
+      r.onerror = () => ok(null);
+    });
+  } catch { return null; }
+}
+async function garderCle(sel, k) {
+  try {
+    const db = await base();
+    const t = db.transaction("cles", "readwrite");
+    t.objectStore("cles").clear();
+    t.objectStore("cles").put(k, sel);
+  } catch { /* pas de stockage : il faudra retaper le mot de passe */ }
+}
+async function oublierCle() {
+  try { const db = await base(); db.transaction("cles", "readwrite").objectStore("cles").clear(); } catch {}
+}
+
+/* ---------- Déchiffrement (AES-256-GCM, clé PBKDF2-SHA256) ---------- */
+const octets = (b64) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+async function deriver(motDePasse, paquet) {
+  const brut = await crypto.subtle.importKey("raw", new TextEncoder().encode(motDePasse), "PBKDF2", false, ["deriveKey"]);
+  return crypto.subtle.deriveKey(
+    { name: "PBKDF2", hash: "SHA-256", salt: octets(paquet.sel), iterations: paquet.iterations },
+    brut, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
+}
+async function dechiffrer(paquet, k) {
+  const clair = await crypto.subtle.decrypt({ name: "AES-GCM", iv: octets(paquet.iv) }, k, octets(paquet.donnees));
+  return JSON.parse(new TextDecoder().decode(clair));
+}
+async function telecharger() {
+  const r = await fetch("donnees.json?" + Date.now(), { cache: "no-store" });
+  if (!r.ok) throw new Error("Données introuvables (" + r.status + ").");
+  return r.json();
+}
+
+/* ---------- Affichage ---------- */
+const fmtHeure = new Intl.DateTimeFormat("fr-FR", { timeZone: FUSEAU, hour: "2-digit", minute: "2-digit" });
+const fmtJour = new Intl.DateTimeFormat("fr-FR", { timeZone: FUSEAU, weekday: "short", day: "numeric", month: "short" });
+const jourParis = (d) => new Intl.DateTimeFormat("en-CA", { timeZone: FUSEAU }).format(d);
+
+function quandMail(iso) {
+  const d = new Date(iso), maintenant = new Date();
+  if (jourParis(d) === jourParis(maintenant)) return fmtHeure.format(d);
+  const hier = new Date(maintenant.getTime() - 864e5);
+  if (jourParis(d) === jourParis(hier)) return "hier " + fmtHeure.format(d);
+  return fmtJour.format(d);
+}
+function el(tag, classe, texte) {
+  const e = document.createElement(tag);
+  if (classe) e.className = classe;
+  if (texte != null) e.textContent = texte;
+  return e;
+}
+function remplir(liste, elements, vide, construire) {
+  liste.replaceChildren();
+  if (!elements || !elements.length) { liste.append(el("li", "vide", vide)); return; }
+  for (const x of elements) { const li = el("li"); li.append(construire(x)); liste.append(li); }
+}
+function lien(href) {
+  const a = el("a", "ligne");
+  a.href = href; a.target = "_blank"; a.rel = "noopener";
+  return a;
+}
+function salutation() {
+  const h = Number(new Intl.DateTimeFormat("fr-FR", { timeZone: FUSEAU, hour: "numeric", hourCycle: "h23" }).format(new Date()));
+  return h < 5 ? "Bonne nuit" : h < 18 ? "Bonjour" : "Bonsoir";
+}
+
+function afficher(d) {
+  $("salut").textContent = salutation() + ", " + d.prenom + ".";
+  $("date").textContent = d.aujourdhui;
+  const maj = new Date(d.maj);
+  const ageHeures = (Date.now() - maj.getTime()) / 36e5;
+  $("maj").innerHTML = "";
+  $("maj").append(el("span", "texte-long", "Données de "), document.createTextNode(quandMail(d.maj)));
+  $("voyant").classList.toggle("vieux", ageHeures > 4);
+
+  const b = d.briefing;
+  const briefingDuJour = b && b.date === jourParis(new Date());
+  $("bref").textContent = b ? b.en_bref : "Pas encore de briefing enregistré.";
+  $("bref-source").textContent = b ? (briefingDuJour ? "Briefing de ce matin" : "Dernier briefing : " + b.titre) : "";
+  $("priorites").replaceChildren();
+  (briefingDuJour ? b.priorites : []).slice(0, 3).forEach((p, i) => {
+    const li = el("li"); li.append(el("span", null, "P" + (i + 1)), el("span", null, p)); $("priorites").append(li);
+  });
+  const alertes = briefingDuJour ? b.attention : [];
+  const conflits = (d.chronos.conflits || []).map((c) => "Conflit d'agenda : " + c);
+  const tout = [...conflits, ...alertes].slice(0, 5);
+  $("alerte").hidden = !tout.length;
+  $("attention").replaceChildren(...tout.map((a) => el("li", null, a)));
+
+  const h = d.hermes;
+  $("nb-taches").textContent = h.taches.length || "";
+  remplir($("taches"), h.taches, "Rien à traiter.", (t) => {
+    const a = lien(t.lien);
+    const corps = el("span", "principal", t.titre);
+    if (t.quand) {
+      const p = el("span", "pastille" + (t.retard ? " retard" : /AUJOURD|demain/.test(t.quand) ? " urgent" : ""), t.quand);
+      const bloc = el("span"); bloc.append(corps, el("br"), p);
+      a.append(el("span", "case"), bloc, el("span"));
+    } else a.append(el("span", "case"), corps, el("span"));
+    return a;
+  });
+  $("nb-non-lus").textContent = h.non_lus ? h.non_lus + " non lus" : "";
+  remplir($("mails"), h.mails.slice(0, 8), "Boîte vide sur 3 jours.", (m) => {
+    const a = lien(m.lien);
+    const texte = el("span", "principal");
+    texte.append(el("strong", null, m.de), el("span", "secondaire", m.objet));
+    m.libelles.forEach((l) => texte.append(el("span", "pastille", l)));
+    a.append(el("span", "puce" + (m.non_lu ? " plein" : "")), texte, el("span", "temps", quandMail(m.date)));
+    return a;
+  });
+
+  const c = d.chronos;
+  $("charge").textContent = c.heures_occupees ? String(c.heures_occupees).replace(".", ",") + " h occupées" : "";
+  const ev = (e, avecJour) => {
+    const s = el("div", "ligne");
+    const t = el("span", "principal", e.titre);
+    if (e.lieu) { const bloc = el("span"); bloc.append(t, el("span", "secondaire", e.lieu)); s.append(el("span", "horaire", avecJour ? e.jour : e.horaire), bloc); }
+    else s.append(el("span", "horaire", avecJour ? e.jour : e.horaire), t);
+    s.append(el("span", "temps", avecJour && e.horaire !== "toute la journée" ? e.horaire.slice(0, 5) : ""));
+    return s;
+  };
+  remplir($("agenda"), c.aujourdhui, "Rien dans l'agenda aujourd'hui.", (e) => ev(e, false));
+  remplir($("bientot"), c.bientot.slice(0, 8), "Rien de prévu.", (e) => ev(e, true));
+
+  $("point-budget").textContent = d.ploutos.aujourdhui ? "Aujourd'hui" : d.ploutos.point_budget;
+  $("budget-note").textContent = d.ploutos.aujourdhui
+    ? "Exporte tes relevés LCL et Revolut du mois dernier (CSV) et envoie-les à PLOUTOS."
+    : "Le suivi des dépenses arrive avec la phase 3 de PLOUTOS.";
+
+  $("briefing-date").textContent = b ? b.titre : "";
+  remplir($("briefing-mails"), b ? b.mails.filter((m) => m.genre !== "securite") : [], "Aucun mail important dans le dernier briefing.", (m) => {
+    const s = el("div", "ligne");
+    const t = el("span", "principal");
+    t.append(el("strong", null, m.de + " "), document.createTextNode(m.resume));
+    if (!/^rien/i.test(m.action)) t.append(el("span", "secondaire", "À faire : " + m.action));
+    s.append(el("span", "puce" + (m.genre === "action" ? " plein" : "")), t, el("span"));
+    return s;
+  });
+}
+
+/* ---------- Réacteur (canvas) ---------- */
+function reacteur(canvas) {
+  const ctx = canvas.getContext("2d");
+  const calme = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const cyan = getComputedStyle(document.documentElement).getPropertyValue("--cyan").trim();
+  function dessiner(t) {
+    const r = canvas.getBoundingClientRect(), dpr = devicePixelRatio || 1;
+    if (canvas.width !== Math.round(r.width * dpr)) { canvas.width = r.width * dpr; canvas.height = r.height * dpr; }
+    const w = canvas.width, c = w / 2;
+    ctx.clearRect(0, 0, w, w);
+    ctx.strokeStyle = cyan; ctx.lineCap = "round";
+    const anneaux = [[0.47, 0.0002, 0.012, 24, 0.5], [0.40, -0.00035, 0.02, 3, 0.9], [0.33, 0.0005, 0.006, 60, 0.35]];
+    for (const [rayon, vitesse, ep, segments, alpha] of anneaux) {
+      ctx.globalAlpha = alpha; ctx.lineWidth = w * ep;
+      const pas = (Math.PI * 2) / segments, angle = calme ? 0 : t * vitesse;
+      for (let i = 0; i < segments; i++) {
+        ctx.beginPath(); ctx.arc(c, c, w * rayon, angle + i * pas, angle + i * pas + pas * 0.62); ctx.stroke();
+      }
+    }
+    const g = ctx.createRadialGradient(c, c, 0, c, c, w * 0.28);
+    g.addColorStop(0, "rgba(95,212,255,.20)"); g.addColorStop(1, "rgba(95,212,255,0)");
+    ctx.globalAlpha = 1; ctx.fillStyle = g; ctx.beginPath(); ctx.arc(c, c, w * 0.28, 0, Math.PI * 2); ctx.fill();
+    if (!calme) requestAnimationFrame(dessiner);
+  }
+  requestAnimationFrame(dessiner);
+}
+function horloge() { $("horloge").textContent = fmtHeure.format(new Date()); }
+
+/* ---------- Démarrage ---------- */
+async function ouvrir(d) {
+  $("verrou").hidden = true; $("console").hidden = false;
+  afficher(d);
+}
+async function demarrer() {
+  horloge(); setInterval(horloge, 15000);
+  reacteur($("reacteur")); reacteur($("reacteur-verrou"));
+  if (DEMO) { $("verrouiller").hidden = true; ouvrir(DEMO); return; }
+  let paquet;
+  try { paquet = await telecharger(); }
+  catch (e) { montrerVerrou("Impossible de charger les données. Vérifie ta connexion puis recharge la page."); return; }
+  cle = await lireCle(paquet.sel);
+  if (cle) {
+    try { return ouvrir(await dechiffrer(paquet, cle)); } catch { cle = null; await oublierCle(); }
+  }
+  montrerVerrou("");
+  $("formulaire").onsubmit = async (ev) => {
+    ev.preventDefault();
+    message("Vérification…", false);
+    try {
+      const k = await deriver($("mdp").value, paquet);
+      const d = await dechiffrer(paquet, k);
+      cle = k; await garderCle(paquet.sel, k); $("mdp").value = "";
+      ouvrir(d);
+    } catch { message("Mot de passe incorrect.", true); }
+  };
+}
+function message(t, erreur) { $("message-verrou").textContent = t; $("message-verrou").classList.toggle("erreur", erreur); }
+function montrerVerrou(t) { $("console").hidden = true; $("verrou").hidden = false; message(t, !!t); $("mdp").focus(); }
+
+$("rafraichir").onclick = async () => {
+  if (DEMO) return afficher(DEMO);
+  try { afficher(await dechiffrer(await telecharger(), cle)); } catch { location.reload(); }
+};
+$("verrouiller").onclick = async () => { await oublierCle(); location.reload(); };
+document.addEventListener("visibilitychange", () => { if (!document.hidden && cle) $("rafraichir").click(); });
+if (!DEMO && "serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+demarrer();
+</script>
+</body>
+</html>
