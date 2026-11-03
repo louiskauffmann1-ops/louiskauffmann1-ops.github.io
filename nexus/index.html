@@ -978,8 +978,8 @@ function chargerPloutos() {
       const e = /\.css(\?|$)/.test(src) ? el("link", { rel: "stylesheet", href: src }) : el("script", { src });
       e.onload = ok; e.onerror = () => ko(new Error("Fichier introuvable : " + src)); document.head.append(e);
     });
-    await Promise.all([charger("ploutos.css?v=3"), charger("ploutos-moteur.js?v=3"), charger("ploutos-coffre.js?v=3")]);
-    await charger("ploutos.js?v=3");
+    await Promise.all([charger("ploutos.css?v=4"), charger("ploutos-moteur.js?v=4"), charger("ploutos-coffre.js?v=4")]);
+    await charger("ploutos.js?v=4");
     if (!window.Ploutos || !window.PloutosMoteur || !window.PloutosCoffre) throw new Error("PLOUTOS n'a pas pu démarrer");
   })().catch((e) => { ploutosPromesse = null; throw e; });
 }

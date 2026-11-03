@@ -60,6 +60,26 @@ label.cmd input[type="file"] { display: none; }
 .pl .pl-tuile-nom, .pl .pl-sous-titre, .pl-dl dt { font-family: var(--corps); font-size: 13px; letter-spacing: 0; text-transform: none; font-weight: 500; }
 .pl .filtre { font: 600 14px/1 var(--corps); letter-spacing: 0; }
 
+/* Navigation par mois */
+.pl-periode-groupe { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.pl-mois { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.pl-mois-fleche {
+  width: 38px; height: 38px; display: grid; place-items: center; padding: 0; cursor: pointer; border-radius: 8px;
+  border: 1px solid var(--ligne-forte); background: rgba(8, 18, 28, .9); color: var(--texte); font: 600 20px/1 var(--corps);
+}
+.pl-mois-fleche:hover:not(:disabled) { border-color: var(--ploutos); color: var(--ploutos); }
+.pl-mois-fleche:disabled { opacity: .3; cursor: default; }
+.pl-mois-nom { min-width: 150px; text-align: center; font: 700 17px/1.2 var(--corps); color: var(--texte); }
+.pl-mois .pl-lien { margin-left: 8px; }
+.pl-carte-tete .pl-mois { margin-left: auto; }
+.pl-op-mois {
+  position: absolute; left: 0; right: 0; display: flex; align-items: flex-end; gap: 6px 16px; flex-wrap: wrap; padding: 0 10px 8px;
+  border-bottom: 1px solid var(--ligne-forte); background: rgba(10, 22, 32, .92); font-size: 13px; color: var(--doux);
+}
+.pl-op-mois > b { font: 700 16px/1.2 var(--corps); color: var(--ploutos); }
+.pl-op-mois span b { color: var(--texte); font-family: var(--mono); font-weight: 600; }
+.pl-op-mois span b.positif { color: var(--ploutos); }
+
 /* Accueil */
 .pl-tuiles.accueil { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
 .pl-tuiles.accueil .pl-tuile { padding: 18px 20px; border-radius: 12px; border-color: var(--ligne-forte); background: linear-gradient(160deg, rgba(14, 30, 46, .6), rgba(6, 13, 21, .8)); }
@@ -332,6 +352,9 @@ button.pl-cat:hover { border-color: var(--ploutos); }
 }
 @media (max-width: 760px) {
   .pl-tete { margin-top: 0; gap: 4px 8px; }
+  .pl-mois-nom { min-width: 120px; font-size: 16px; }
+  .pl-carte-tete .pl-mois { margin-left: 0; }
+  .pl-op-mois { padding-bottom: 6px; }
   .pl-statut { order: -1; width: 100%; }
   .pl-onglets { order: 1; width: 100%; }
   .pl-actions { order: 0; margin-left: 0; padding: 0; }
