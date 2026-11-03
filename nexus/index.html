@@ -781,7 +781,8 @@ function vueNexus(d) {
     jauge({ valeur: h.taches.length, max: 10, lib: "Tâches", unite: retards ? retards + " EN RETARD" : "OUVERTES", teinte: retards ? "var(--alerte)" : "var(--hermes)" }),
     jauge({ valeur: h.non_lus, max: 30, lib: "Non lus", unite: "BOÎTE", teinte: "var(--hermes)" }),
     jauge({ valeur: c.heures_occupees, max: 12, texte: String(c.heures_occupees).replace(".", ","), lib: "Charge", unite: "HEURES", teinte: "var(--chronos)" }),
-    jauge({ valeur: 31 - Math.min(jBudget, 31), max: 31, texte: jBudget ? "J-" + jBudget : "J", lib: "Budget", unite: "LE 5", teinte: "var(--ploutos)" })));
+    jauge({ valeur: 31 - Math.min(jBudget, 31), max: 31, texte: jBudget ? "J-" + jBudget : "J", lib: "Budget",
+      unite: (window.Ploutos && window.Ploutos.resume() || {}).aValider ? window.Ploutos.resume().aValider + " À CLASSER" : "LE 5", teinte: "var(--ploutos)" })));
 
   const alertes = [...(c.conflits || []).map((x) => "Conflit d'agenda : " + x), ...(duJour ? b.attention : [])].slice(0, 5);
   const prochain = prochainEvenement(d);
@@ -968,20 +969,34 @@ function vueChronos(d) {
     el("div", { class: "s12" }, panneau("7 prochains jours", el("span", { class: "meta" }, c.bientot.length + " ÉVÉNEMENTS"), "", el("div", { class: "semaine" }, jours))));
 }
 
-/* --- PLOUTOS --- */
-function vuePloutos(d) {
-  const j = joursEntre(d.ploutos.point_budget_date);
-  return el("div", { class: "grille" },
-    el("div", { class: "s4" }, panneau("Point budget", el("span", { class: "meta" }, d.ploutos.point_budget.toUpperCase()), "",
-      el("div", { class: "jauges", style: "grid-template-columns:1fr" }, jauge({ valeur: 31 - Math.min(j, 31), max: 31, texte: j ? "J-" + j : "AUJ.", lib: j ? "avant le point du mois" : "c'est aujourd'hui", unite: "LE 5 DU MOIS" })))),
-    el("div", { class: "s8" }, panneau("Procédure du point budget", null, "",
-      el("ol", { class: "etapes" },
-        el("li", null, el("span", null, "Exporte tes relevés LCL et Revolut du mois dernier au format CSV.")),
-        el("li", null, el("span", null, "Envoie-les à PLOUTOS dans le projet Claude NEXUS.")),
-        el("li", null, el("span", null, "PLOUTOS classe les dépenses et compare au mois précédent."))))),
-    el("div", { class: "s12" }, panneau("Flux financiers", el("span", { class: "meta" }, "PHASE 3"), "",
-      el("div", { class: "hors-ligne" }, el("canvas", { "data-brouillage": "" }),
-        el("div", { class: "msg" }, el("b", null, "AUCUNE DONNÉE"), el("span", null, "Les dépenses par catégorie et l'évolution du mois s'afficheront ici après ton premier point budget."))))));
+/* --- PLOUTOS : module chargé à la demande (ploutos-moteur.js, ploutos-coffre.js, ploutos.js, ploutos.css) --- */
+const CLE_COFFRE = "ploutos:coffre";
+let paquetCourant = null, ploutosPromesse = null;
+function chargerPloutos() {
+  return ploutosPromesse ||= (async () => {
+    const charger = (src) => new Promise((ok, ko) => {
+      const e = /\.css(\?|$)/.test(src) ? el("link", { rel: "stylesheet", href: src }) : el("script", { src });
+      e.onload = ok; e.onerror = () => ko(new Error("Fichier introuvable : " + src)); document.head.append(e);
+    });
+    await Promise.all([charger("ploutos.css?v=1"), charger("ploutos-moteur.js?v=1"), charger("ploutos-coffre.js?v=1")]);
+    await charger("ploutos.js?v=1");
+    if (!window.Ploutos || !window.PloutosMoteur || !window.PloutosCoffre) throw new Error("PLOUTOS n'a pas pu démarrer");
+  })().catch((e) => { ploutosPromesse = null; throw e; });
+}
+/* Clé du coffre PLOUTOS, tirée de la même phrase secrète mais distincte de celle des données (sel propre, chiffre et déchiffre). */
+async function preparerCleCoffre(mdp) {
+  const sel = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode("ploutos-coffre|" + mdp))).slice(0, 16);
+  const brut = await crypto.subtle.importKey("raw", new TextEncoder().encode(mdp), "PBKDF2", false, ["deriveKey"]);
+  const k = await crypto.subtle.deriveKey({ name: "PBKDF2", hash: "SHA-256", salt: sel, iterations: 600000 }, brut, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+  try { const db = await base(); db.transaction("cles", "readwrite").objectStore("cles").put(k, CLE_COFFRE); } catch {}
+  return k;
+}
+function vuePloutos() {
+  if (window.Ploutos) return window.Ploutos.vue();
+  const attente = el("div", { class: "vide" }, "Chargement de PLOUTOS…");
+  chargerPloutos().then(() => { if (courant === "ploutos") rendre(); })
+    .catch((e) => attente.replaceWith(panneau("PLOUTOS indisponible", null, "alerte", el("p", null, e.message + ". Vérifie ta connexion puis recharge la page."))));
+  return attente;
 }
 
 /* --- PHÉMÈ --- */
@@ -1257,7 +1272,7 @@ function commandeLocale(question) {
 
 /* --- Les données envoyées à Claude : tout le tableau de bord, sans liens ni clés --- */
 function contexte() {
-  const propre = JSON.stringify(donnees, (k, v) => (k === "jarvis" || k === "actions" || k === "lien" || k === "points" ? undefined : v));
+  const propre = JSON.stringify(donnees, (k, v) => (k === "jarvis" || k === "actions" || k === "coffre" || k === "lien" || k === "points" ? undefined : v));
   return "Données NEXUS, synchronisées " + quand(donnees.maj) + " :\n" + propre;
 }
 function consignes() {
@@ -1472,6 +1487,7 @@ async function demarrer() {
   let paquet;
   try { paquet = await telecharger(); }
   catch { return montrerVerrou("Impossible de charger les données. Vérifie ta connexion puis recharge la page."); }
+  paquetCourant = paquet;
   cle = await lireCle(paquet.sel);
   if (cle) {
     try { return await ouvrir(await dechiffrer(paquet, cle)); } catch { cle = null; await oublierCle(); }
@@ -1483,7 +1499,9 @@ async function demarrer() {
     try {
       const k = await deriver($("mdp").value, paquet);
       const d = await dechiffrer(paquet, k);
+      const mdp = $("mdp").value;
       cle = k; await garderCle(paquet.sel, k); $("mdp").value = "";
+      preparerCleCoffre(mdp).catch(() => {});
       ouvrir(d);
     } catch { message("Mot de passe incorrect.", true); }
   };
@@ -1493,7 +1511,7 @@ function montrerVerrou(t) { $("appli").hidden = true; $("verrou").hidden = false
 
 $("rafraichir").onclick = async () => {
   if (DEMO) return rendre();
-  try { donnees = appliquerFaites(await dechiffrer(await telecharger(), cle)); rendre(); } catch { location.reload(); }
+  try { const p = await telecharger(); donnees = appliquerFaites(await dechiffrer(p, cle)); paquetCourant = p; rendre(); } catch { location.reload(); }
 };
 $("verrouiller").onclick = async () => { await oublierCle(); location.reload(); };
 addEventListener("hashchange", () => aller(location.hash.slice(1), true));
