@@ -243,6 +243,19 @@ a.rangee:hover .principal { color: var(--m); }
 .barre.ambre i { background: var(--ambre); box-shadow: 0 0 6px var(--ambre); }
 .case { width: 14px; height: 14px; border: 1.5px solid var(--m); position: relative; }
 .case::after { content: ""; position: absolute; inset: 3px; background: color-mix(in srgb, var(--m) 30%, transparent); }
+button.case { width: 22px; height: 22px; padding: 0; background: none; cursor: pointer; }
+button.case::before { content: ""; position: absolute; inset: -10px; }  /* zone de toucher plus large */
+button.case:hover::after { background: var(--m); }
+.rangee.faite .case::after { inset: 2px; background: var(--ploutos); box-shadow: 0 0 8px var(--ploutos); }
+.rangee.faite .principal { text-decoration: line-through; color: var(--doux); }
+.rangee.faite { opacity: .7; transition: opacity .6s; }
+.rangee a.principal:hover { color: var(--m); }
+.avis {
+  position: fixed; z-index: 45; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
+  max-width: min(520px, calc(100vw - 32px)); padding: 10px 16px; border: 1px solid var(--ploutos);
+  background: rgba(4, 14, 12, .96); color: var(--texte); font-size: 14px; box-shadow: 0 0 24px rgba(0, 0, 0, .6);
+}
+.avis.erreur { border-color: var(--alerte); background: rgba(30, 6, 10, .96); }
 
 /* CHRONOS */
 .horloge-24 svg { width: 100%; max-width: 420px; display: block; margin: 0 auto; overflow: visible; }
@@ -391,6 +404,7 @@ a.rangee:hover .principal { color: var(--m); }
   .jarvis-bouton { width: 64px; height: 64px; right: max(14px, env(safe-area-inset-right, 0px)); bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
   .jarvis { z-index: 35; width: 100vw; border-left: 0; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
   .j-micro { width: 112px; height: 112px; }
+  .avis { bottom: calc(150px + env(safe-area-inset-bottom, 0px)); }
 }
 @media (max-width: 420px) {
   .accueil .col-jauges .jauges { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -414,6 +428,7 @@ a.rangee:hover .principal { color: var(--m); }
   </form>
 </section>
 
+<div class="avis" id="avis" role="status" hidden></div>
 <div class="demarrage" id="demarrage" hidden><pre id="journal-demarrage"></pre></div>
 
 <div class="appli" id="appli" hidden>
@@ -819,11 +834,52 @@ function ligneTache(t) {
   const restant = t.echeance ? joursEntre(t.echeance) : null;
   const teinte = t.retard ? "rouge" : restant != null && restant <= 1 ? "ambre" : "";
   const plein = restant == null ? 0 : t.retard ? 100 : Math.max(6, 100 - restant / 14 * 100);
-  return lien(t.lien, { class: "rangee" },
-    el("span", { class: "case" }),
-    el("span", { class: "principal" }, t.titre, el("span", { class: "secondaire" }, t.quand ? t.quand.toLowerCase() : "sans échéance")),
+  return el("div", { class: "rangee tache" },
+    el("button", { class: "case", type: "button", title: "Marquer comme faite", "aria-label": "Marquer comme faite : " + t.titre, onclick: (ev) => cocher(t, ev.currentTarget) }),
+    lien(t.lien, { class: "principal" }, t.titre, el("span", { class: "secondaire" }, t.quand ? t.quand.toLowerCase() : "sans échéance")),
     el("span", { class: "echeance" }, el("span", { class: "temps" }, restant == null ? "—" : t.retard ? "RETARD" : restant === 0 ? "JOUR J" : "J-" + restant),
       el("span", { class: "barre " + teinte }, el("i", { style: `width:${plein}%` }))));
+}
+/* Cocher une tâche : la console lance le workflow « Tâche faite » du dépôt olympe, qui retire le
+   libellé « À traiter » dans Gmail et ferme la tâche. En attendant la mise à jour des données
+   (une à deux minutes), la tâche est retenue sur l'appareil et masquée. */
+function lireFaites() { try { return JSON.parse(localStorage.getItem("nexus-faites") || "{}"); } catch { return {}; } }
+function garderFaites(f) { try { localStorage.setItem("nexus-faites", JSON.stringify(f)); } catch {} }
+function appliquerFaites(d) {
+  const faites = lireFaites(), ids = new Set(d.hermes.taches.map((t) => t.id));
+  for (const id of Object.keys(faites)) if (!ids.has(id) || Date.now() - faites[id] > 864e5) delete faites[id];
+  garderFaites(faites);
+  d.hermes.taches = d.hermes.taches.filter((t) => !faites[t.id]);
+  return d;
+}
+function avis(texte, erreur) {
+  const a = $("avis");
+  a.textContent = texte; a.classList.toggle("erreur", !!erreur); a.hidden = false;
+  clearTimeout(avis.minuteur); avis.minuteur = setTimeout(() => { a.hidden = true; }, 4200);
+}
+async function cocher(t, bouton) {
+  if (!t.id || bouton.disabled) return;
+  const rangee = bouton.closest(".rangee");
+  bouton.disabled = true; rangee.classList.add("faite");
+  try {
+    if (!DEMO) {
+      const a = donnees.actions;
+      if (!a) throw new Error("Pour cocher depuis la console, ajoute le jeton NEXUS_ACTIONS_TOKEN (étape 8 du guide).");
+      const r = await fetch(`https://api.github.com/repos/${a.depot}/actions/workflows/tache.yml/dispatches`, {
+        method: "POST",
+        headers: { authorization: "Bearer " + a.jeton, accept: "application/vnd.github+json", "content-type": "application/json" },
+        body: JSON.stringify({ ref: "main", inputs: { email_id: t.id } }),
+      });
+      if (!r.ok) throw new Error(r.status === 401 || r.status === 403 || r.status === 404
+        ? "GitHub refuse le jeton : vérifie le secret NEXUS_ACTIONS_TOKEN." : "GitHub ne répond pas (" + r.status + "). Réessaie.");
+    }
+    const faites = lireFaites(); faites[t.id] = Date.now(); garderFaites(faites);
+    avis("Tâche faite : " + t.titre);
+    setTimeout(() => { appliquerFaites(donnees); rendre(); }, 700);
+  } catch (e) {
+    bouton.disabled = false; rangee.classList.remove("faite");
+    avis(e instanceof TypeError ? "Pas de connexion. Réessaie." : e.message, true);
+  }
 }
 function vueHermes(d) {
   const h = d.hermes;
@@ -848,7 +904,7 @@ function vueHermes(d) {
   return el("div", { class: "grille" },
     el("div", { class: "s5" }, panneau("À traiter", el("span", { class: "compte" }, String(h.taches.length)), "",
       liste(h.taches, "Rien à traiter. Les nouvelles tâches arrivent avec le briefing du matin.", ligneTache),
-      el("p", { class: "secondaire", style: "margin:12px 0 0" }, "Tâche faite : retire le libellé « À traiter » du mail dans Gmail."))),
+      el("p", { class: "secondaire", style: "margin:12px 0 0" }, "Coche une tâche quand elle est faite : elle se ferme aussi dans Gmail."))),
     el("div", { class: "s4" }, panneau("Boîte de réception", el("span", { class: "meta" }, h.non_lus + " NON LUS"), "",
       liste(h.mails, "Boîte vide sur 3 jours.", (m) => lien(m.lien, { class: "rangee" },
         el("span", { class: "losange" + (m.non_lu ? " plein" : "") }),
@@ -1198,9 +1254,9 @@ function commandeLocale(question) {
   return cibles.find(([, re]) => re.test(t))?.[0] || null;
 }
 
-/* --- Les données envoyées à Claude : tout le tableau de bord, sans liens ni clé --- */
+/* --- Les données envoyées à Claude : tout le tableau de bord, sans liens ni clés --- */
 function contexte() {
-  const propre = JSON.stringify(donnees, (k, v) => (k === "jarvis" || k === "lien" || k === "points" ? undefined : v));
+  const propre = JSON.stringify(donnees, (k, v) => (k === "jarvis" || k === "actions" || k === "lien" || k === "points" ? undefined : v));
   return "Données NEXUS, synchronisées " + quand(donnees.maj) + " :\n" + propre;
 }
 function consignes() {
@@ -1400,7 +1456,7 @@ async function sequenceDemarrage() {
   setTimeout(() => { ecran.hidden = true; }, 500);
 }
 async function ouvrir(d) {
-  donnees = d;
+  donnees = appliquerFaites(d);
   $("verrou").hidden = true;
   $("appli").hidden = false;
   aller((location.hash || "#nexus").slice(1), true);
@@ -1436,7 +1492,7 @@ function montrerVerrou(t) { $("appli").hidden = true; $("verrou").hidden = false
 
 $("rafraichir").onclick = async () => {
   if (DEMO) return rendre();
-  try { donnees = await dechiffrer(await telecharger(), cle); rendre(); } catch { location.reload(); }
+  try { donnees = appliquerFaites(await dechiffrer(await telecharger(), cle)); rendre(); } catch { location.reload(); }
 };
 $("verrouiller").onclick = async () => { await oublierCle(); location.reload(); };
 addEventListener("hashchange", () => aller(location.hash.slice(1), true));
