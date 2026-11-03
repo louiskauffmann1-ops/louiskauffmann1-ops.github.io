@@ -700,6 +700,20 @@ M.appliquer = function (etat, action) {
       out.ids = ids;
       break;
     }
+    case "classer-ia": {
+      // Classement proposé par l'IA pour les opérations qu'aucune règle ne reconnaît. Les réponses sûres deviennent
+      // des règles (fournies par l'interface, avec leurs identifiants) pour ne plus jamais redemander à l'IA.
+      for (const r of action.regles || []) if (r && r.action?.categorie && !cfg.regles.some((x) => x.id === r.id)) cfg.regles.push({ priorite: 60, active: true, origine: "ia", ...r });
+      for (const x of action.resultats || []) {
+        const o = ops[x.id];
+        if (!o || o.source === "manuel" || o.lien || o.categorie || !M.categorie(etat, x.categorie)) continue;
+        o.categorie = x.categorie; o.source = "ia"; o.aValider = !x.sur; o.nature = M.natureDe(etat, x.categorie) || o.nature;
+        out.ids.push(o.id);
+      }
+      ent.resume = `${out.ids.length} opération(s) classée(s) par l'IA` + ((action.regles || []).length ? `, ${action.regles.length} règle(s) créée(s)` : "");
+      ent.details = { ids: out.ids };
+      break;
+    }
     case "categoriser": {
       const avant = {};
       const nature = M.natureDe(etat, action.categorie);

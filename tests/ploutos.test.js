@@ -294,3 +294,28 @@ test("coffre : premier contact avec un dépôt déjà rempli", async () => {
   await b2.resoudreConflitInitial("en-ligne");
   assert.equal(Object.keys(b2.etat.operations).length, 13);
 });
+
+test("classement par l'IA : seulement les non classées, règles créées pour les réponses sûres", () => {
+  const etat = M.etatVide();
+  importer(etat, lire(LCL));
+  const libres = Object.values(etat.operations).filter((o) => !o.categorie);
+  assert.ok(libres.length >= 2);
+  const [a, b] = libres;
+  const deja = Object.values(etat.operations).find((o) => o.categorie && !o.lien);
+  const regle = { ...M.proposerRegle(a, "loisirs-bars"), id: "ia_1", origine: "ia" };
+  const res = M.appliquer(etat, { type: "classer-ia", id: "ia", regles: [regle], resultats: [
+    { id: a.id, categorie: "loisirs-bars", sur: true },
+    { id: b.id, categorie: "divers-depenses-non-classees", sur: false },
+    { id: deja.id, categorie: "loisirs-bars", sur: true },     // déjà classée : on n'y touche pas
+    { id: "inconnue", categorie: "loisirs-bars", sur: true },
+  ] });
+  assert.deepEqual(res.ids.sort(), [a.id, b.id].sort());
+  assert.equal(etat.operations[a.id].source, "ia");
+  assert.equal(etat.operations[a.id].aValider, false);
+  assert.equal(etat.operations[b.id].aValider, true);
+  assert.notEqual(etat.operations[deja.id].categorie, "loisirs-bars");
+  assert.ok(etat.config.regles.some((r) => r.id === "ia_1" && r.origine === "ia"));
+  // Reclasser ne défait pas le travail de l'IA
+  M.appliquer(etat, { type: "reclasser", id: "rc" });
+  assert.equal(etat.operations[b.id].categorie, "divers-depenses-non-classees");
+});

@@ -971,15 +971,15 @@ function vueChronos(d) {
 
 /* --- PLOUTOS : module chargé à la demande (ploutos-moteur.js, ploutos-coffre.js, ploutos.js, ploutos.css) --- */
 const CLE_COFFRE = "ploutos:coffre";
-let paquetCourant = null, ploutosPromesse = null;
+let paquetCourant = null, ploutosPromesse = null, cleCoffreEnCours = null;
 function chargerPloutos() {
   return ploutosPromesse ||= (async () => {
     const charger = (src) => new Promise((ok, ko) => {
       const e = /\.css(\?|$)/.test(src) ? el("link", { rel: "stylesheet", href: src }) : el("script", { src });
       e.onload = ok; e.onerror = () => ko(new Error("Fichier introuvable : " + src)); document.head.append(e);
     });
-    await Promise.all([charger("ploutos.css?v=1"), charger("ploutos-moteur.js?v=1"), charger("ploutos-coffre.js?v=1")]);
-    await charger("ploutos.js?v=1");
+    await Promise.all([charger("ploutos.css?v=2"), charger("ploutos-moteur.js?v=2"), charger("ploutos-coffre.js?v=2")]);
+    await charger("ploutos.js?v=2");
     if (!window.Ploutos || !window.PloutosMoteur || !window.PloutosCoffre) throw new Error("PLOUTOS n'a pas pu démarrer");
   })().catch((e) => { ploutosPromesse = null; throw e; });
 }
@@ -1501,7 +1501,7 @@ async function demarrer() {
       const d = await dechiffrer(paquet, k);
       const mdp = $("mdp").value;
       cle = k; await garderCle(paquet.sel, k); $("mdp").value = "";
-      preparerCleCoffre(mdp).catch(() => {});
+      cleCoffreEnCours = preparerCleCoffre(mdp).catch(() => null);
       ouvrir(d);
     } catch { message("Mot de passe incorrect.", true); }
   };

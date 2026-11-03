@@ -1,7 +1,7 @@
 // NEXUS : garde la page en cache pour l'ouvrir hors connexion, toujours en version fraîche si le réseau répond.
-const CACHE = "nexus-v2";
+const CACHE = "nexus-v3";
 const FICHIERS = ["./", "index.html", "manifest.webmanifest", "icone.svg", "icone-192.png", "icone-512.png",
-  "ploutos.css?v=1", "ploutos-moteur.js?v=1", "ploutos-coffre.js?v=1", "ploutos.js?v=1"];
+  "ploutos.css?v=2", "ploutos-moteur.js?v=2", "ploutos-coffre.js?v=2", "ploutos.js?v=2"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FICHIERS)).then(() => self.skipWaiting()));
