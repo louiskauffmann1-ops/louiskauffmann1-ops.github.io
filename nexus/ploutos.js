@@ -27,7 +27,7 @@ const I = {
 const P = {
   coffre: null, etat: null, phase: "chargement", erreur: null,
   onglet: memo.lire("onglet", "apercu"), sousReglages: "categories",
-  filtres: { periode: "mois", du: "", au: "", compte: "", cible: "", aValider: false, q: "", ...memo.lire("filtres", {}), q: "", aValider: false },
+  filtres: { du: "", au: "", compte: "", cible: "", ...memo.lire("filtres", {}), periode: "mois", mois: "", q: "", aValider: false },
   selection: new Set(), importsEnCours: null, racine: null, corps: null, liste: null, suggestion: null,
 };
 const E = () => P.etat;
@@ -110,7 +110,8 @@ function vue() {
 }
 function aller(onglet, filtres) {
   P.onglet = onglet; memo.ecrire("onglet", onglet);
-  if (filtres) { Object.assign(P.filtres, filtres); memo.ecrire("filtres", { ...P.filtres, q: "", aValider: false }); }
+  if (onglet === "apercu" && !filtres && P.filtres.periode !== "mois") { P.filtres.periode = "mois"; P.filtres.aValider = false; }
+  if (filtres) { Object.assign(P.filtres, filtres); memo.ecrire("filtres", { compte: P.filtres.compte, cible: P.filtres.cible, du: P.filtres.du, au: P.filtres.au }); }
   P.selection.clear();
   dessiner();
   if (P.racine.getBoundingClientRect().top < 0) scrollTo({ top: 0 });
@@ -196,7 +197,29 @@ function conflitInitial() {
 }
 
 /* ---------------------------------------------------------------- Filtres */
-function bornes() { return M.periode(P.filtres.periode, aujourdhui(), P.filtres.du, P.filtres.au); }
+// La période de référence est UN mois (le mois en cours à l'ouverture), qu'on fait défiler avec ‹ ›.
+const moisCourant = () => aujourdhui().slice(0, 7);
+const moisChoisi = () => P.filtres.mois || moisCourant();
+function decalerMois(m, n) { const d = new Date(Date.UTC(Number(m.slice(0, 4)), Number(m.slice(5, 7)) - 1 + n, 1)); return d.toISOString().slice(0, 7); }
+function finDuMois(m) { return new Date(Date.UTC(Number(m.slice(0, 4)), Number(m.slice(5, 7)), 0)).toISOString().slice(0, 10); }
+const nomMois = (m, annee = true) => { const n = MOIS_NOMS[Number(m.slice(5, 7)) - 1]; return n[0].toUpperCase() + n.slice(1) + (annee ? " " + m.slice(0, 4) : ""); };
+function bornes() {
+  const f = P.filtres;
+  if (f.periode === "mois") { const m = moisChoisi(); return { du: m + "-01", au: finDuMois(m) }; }
+  return M.periode(f.periode, aujourdhui(), f.du, f.au);
+}
+/** ‹ Novembre 2026 › : change de mois ; « Revenir à ce mois » quand on s'en éloigne. */
+function navigateurMois(auChangement) {
+  const f = P.filtres, m = moisChoisi(), courant = m === moisCourant();
+  const aller_ = (n) => { f.periode = "mois"; f.mois = decalerMois(m, n); P.selection.clear(); auChangement(); };
+  if (f.periode !== "mois") return el("div", { class: "pl-mois" },
+    el("button", { type: "button", class: "pl-lien", onclick: () => { f.periode = "mois"; f.mois = ""; auChangement(); } }, "Revenir au mois en cours"));
+  return el("div", { class: "pl-mois" },
+    el("button", { type: "button", class: "pl-mois-fleche", "aria-label": "Mois précédent", onclick: () => aller_(-1) }, "‹"),
+    el("span", { class: "pl-mois-nom", "aria-live": "polite" }, nomMois(m)),
+    el("button", { type: "button", class: "pl-mois-fleche", "aria-label": "Mois suivant", disabled: courant, onclick: () => aller_(1) }, "›"),
+    !courant ? el("button", { type: "button", class: "pl-lien", onclick: () => { f.periode = "mois"; f.mois = ""; auChangement(); } }, "Revenir à " + nomMois(moisCourant(), false).toLowerCase()) : null);
+}
 function filtreCible(o) {
   const c = P.filtres.cible;
   if (!c) return true;
@@ -217,12 +240,13 @@ function nomCible(c) {
   if (c.startsWith("g:")) return M.groupe(E(), c.slice(2))?.nom || "Groupe";
   return M.categorie(E(), c)?.nom || "Catégorie";
 }
-const PERIODES = [["mois", "Ce mois"], ["mois-1", "Mois dernier"], ["3mois", "3 derniers mois"], ["annee", "Cette année"], ["tout", "Tout"], ["perso", "Personnalisée"]];
+const PERIODES = [["mois", "Par mois"], ["annee", "Cette année"], ["tout", "Tout l'historique"], ["perso", "Dates choisies"]];
 function barreFiltres({ recherche = false, auChangement }) {
   const f = P.filtres;
-  const changer = (k, v) => { f[k] = v; memo.ecrire("filtres", { ...f, q: "", aValider: false }); P.selection.clear(); auChangement(); };
-  const periode = el("select", { "aria-label": "Période", onchange: (e) => { changer("periode", e.target.value); } },
-    PERIODES.map(([v, n]) => el("option", { value: v, selected: f.periode === v }, n)));
+  const changer = (k, v) => { f[k] = v; memo.ecrire("filtres", { compte: f.compte, cible: f.cible, du: f.du, au: f.au }); P.selection.clear(); auChangement(); };
+  const periode = el("div", { class: "pl-periode-groupe" }, navigateurMois(auChangement),
+    el("select", { "aria-label": "Période", class: "pl-periode", onchange: (e) => { f.mois = ""; changer("periode", e.target.value); } },
+      PERIODES.map(([v, n]) => el("option", { value: v, selected: f.periode === v }, n))));
   const dates = f.periode === "perso" ? [
     el("input", { type: "date", value: f.du, "aria-label": "Du", onchange: (e) => changer("du", e.target.value) }),
     el("input", { type: "date", value: f.au, "aria-label": "Au", onchange: (e) => changer("au", e.target.value) })] : [];
@@ -258,14 +282,14 @@ function vueApercu() {
   const f = P.filtres;
   const periode = opsFiltrees({ recherche: false });
   const t = M.totaux(etat, periode);
-  const nomPeriode = f.periode === "mois" ? MOIS_NOMS[Number(auj.slice(5, 7)) - 1]
-    : f.periode === "mois-1" ? MOIS_NOMS[(Number(auj.slice(5, 7)) + 10) % 12] : (PERIODES.find(([v]) => v === f.periode) || [, "la période"])[1].toLowerCase();
+  const nomPeriode = f.periode === "mois" ? nomMois(moisChoisi(), moisChoisi().slice(0, 4) !== auj.slice(0, 4)).toLowerCase()
+    : f.periode === "annee" ? "l'année" : f.periode === "tout" ? "tout l'historique" : "la période";
   const bilan = t.revenus - t.depenses;
 
   // Tuiles : un compte par tuile, puis le bilan de la période
   const tuiles = etat.config.comptes.map((c) => tuileSolde(c.nom.replace(/ compte courant$/i, ""), M.solde(etat, c.id, auj), c.id));
   tuiles.push(el("div", { class: "pl-tuile bilan" + (bilan < 0 ? " negatif" : "") },
-    el("div", { class: "pl-tuile-nom" }, bilan >= 0 ? "Il te reste" : "Tu as dépensé de plus"),
+    el("div", { class: "pl-tuile-nom" }, (bilan >= 0 ? "Il te reste" : "Dépensé en plus") + (f.periode === "mois" ? " · " + nomMois(moisChoisi(), false).toLowerCase() : "")),
     el("div", { class: "pl-tuile-val" }, euros(Math.abs(bilan))),
     el("span", { class: "pl-etat" }, `revenus ${euros(t.revenus, { rond: true })} − dépenses ${euros(t.depenses, { rond: true })}`)));
 
@@ -292,8 +316,7 @@ function vueApercu() {
       el("button", { type: "button", class: "pl-mini-bouton", onclick: (e) => choisirCategorie(e.currentTarget, [o.id]) }, c ? "Changer" : "Classer"));
   };
 
-  const choixPeriode = el("select", { class: "pl-periode", "aria-label": "Période", onchange: (e) => { f.periode = e.target.value; memo.ecrire("filtres", { ...f, q: "", aValider: false }); dessiner(); } },
-    PERIODES.filter(([v]) => v !== "perso").map(([v, n]) => el("option", { value: v, selected: f.periode === v }, n)));
+  const choixPeriode = navigateurMois(dessiner);
 
   return el("div", { class: "pl-pile" },
     el("div", { class: "pl-tuiles accueil" }, tuiles),
@@ -398,18 +421,30 @@ function listeVirtuelle(obtenir) {
   const zone = el("div", { class: "pl-liste", role: "table", tabindex: "0" });
   const piste = el("div", { class: "pl-piste" });
   zone.append(piste);
-  let ops = [], debut = -1, fin = -1;
+  let ops = [], lignes = [], debut = -1, fin = -1;
+  // Une ligne d'en-tête par mois (nom, dépenses, rentrées), puis ses opérations.
+  function decouper() {
+    lignes = []; let m = null, tete = null;
+    for (const o of ops) {
+      if (o.date.slice(0, 7) !== m) { m = o.date.slice(0, 7); tete = { entete: m, depenses: 0, revenus: 0, n: 0 }; lignes.push(tete); }
+      tete.n++;
+      if (o.nature === "depense" && o.montant < 0) tete.depenses -= o.montant; else if (o.nature === "revenu" && o.montant > 0) tete.revenus += o.montant;
+      lignes.push(o);
+    }
+  }
+  const ligneMois = (x) => el("div", { class: "pl-op-mois", role: "row" }, el("b", null, nomMois(x.entete)),
+    el("span", null, x.n + " op. · dépenses ", el("b", null, euros(x.depenses, { rond: true })), " · rentrées ", el("b", { class: "positif" }, euros(x.revenus, { rond: true }))));
   function peindre(force) {
     const h = haut(), vue = zone.clientHeight || 600;
-    const d = Math.max(0, Math.floor(zone.scrollTop / h) - 8), f = Math.min(ops.length, Math.ceil((zone.scrollTop + vue) / h) + 8);
+    const d = Math.max(0, Math.floor(zone.scrollTop / h) - 8), f = Math.min(lignes.length, Math.ceil((zone.scrollTop + vue) / h) + 8);
     if (!force && d === debut && f === fin) return;
     debut = d; fin = f;
-    piste.style.height = ops.length * h + "px";
-    piste.replaceChildren(...ops.slice(d, f).map((o, i) => { const r = ligneOperation(o); r.style.top = (d + i) * h + "px"; r.style.height = h + "px"; return r; }));
+    piste.style.height = lignes.length * h + "px";
+    piste.replaceChildren(...lignes.slice(d, f).map((o, i) => { const r = o.entete ? ligneMois(o) : ligneOperation(o); r.style.top = (d + i) * h + "px"; r.style.height = h + "px"; return r; }));
   }
   zone.addEventListener("scroll", () => requestAnimationFrame(() => peindre(false)), { passive: true });
   addEventListener("resize", () => peindre(true));
-  return { zone, maj() { ops = obtenir(); peindre(true); if (!ops.length) piste.replaceChildren(el("div", { class: "vide", style: "padding:18px" }, "Aucune opération ne correspond.")); }, ops: () => ops };
+  return { zone, maj() { ops = obtenir(); decouper(); peindre(true); if (!ops.length) piste.replaceChildren(el("div", { class: "vide", style: "padding:18px" }, "Aucune opération ne correspond.")); }, ops: () => ops };
 }
 function vueOperations() {
   const recherche = el("input", { type: "search", class: "pl-recherche", value: P.filtres.q, placeholder: "Rechercher : commerçant, montant (45,90 · >100), date (12/10 · oct), banque, catégorie, « à valider »…",
