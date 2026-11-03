@@ -6,7 +6,7 @@
 "use strict";
 
 const M = {};
-const VERSION = 1;
+const VERSION = 2;  // 2 : provenance multiple, mois de rattachement, réglages (migration sans perte depuis 1)
 M.VERSION = VERSION;
 
 /* ---------------------------------------------------------------- Outils */
@@ -292,15 +292,19 @@ const ARBRE = [
   G("finances", "Finances et frais bancaires", "depense", "#ff7a6b", ["Frais bancaires", "Commissions", "Intérêts débiteurs", "Assurances financières", "Impôts et taxes", "Paiements en plusieurs fois", "Autres frais financiers"]),
   G("divers", "Divers", "depense", "#9fb3c4", ["Dépenses exceptionnelles", "Dons", "Remboursements effectués", "Retrait d'espèces", "Paiements entre amis", "Dépenses non classées"]),
   G("revenus", "Revenus", "revenu", "#4ff0a6", ["Salaire", "Primes", "Remboursements reçus", "Aide familiale", "Intérêts d'épargne", "Autres revenus"]),
-  G("interne", "Mouvements internes", "interne", "#7f98ab", ["Virement entre mes comptes", "Versement vers l'épargne", "Retrait de l'épargne"]),
+  G("interne", "Mouvements internes", "interne", "#7f98ab", ["Virement entre mes comptes", "Versement vers l'épargne", "Retrait de l'épargne", "Compte non suivi"]),
 ];
 const slug = (s) => normaliser(s).replace(/ /g, "-").slice(0, 32);
 const ID_CATEGORIE = {  // raccourcis lisibles pour les règles de base et les virements internes
   amis: "divers-paiements-entre-amis", especes: "divers-retrait-d-especes", nonclasse: "divers-depenses-non-classees",
   virement: "interne-virement-entre-mes-comptes", versement: "interne-versement-vers-l-epargne", retrait: "interne-retrait-de-l-epargne",
   interets: "revenus-interets-d-epargne", salaire: "revenus-salaire", remboursement: "revenus-remboursements-recus",
+  nonSuivi: "interne-compte-non-suivi", aide: "revenus-aide-familiale",
 };
 M.ID_CATEGORIE = ID_CATEGORIE;
+
+/** Conventions de calcul réglables (décisions D1 à D3 du contrat, valeurs recommandées par défaut). */
+M.reglagesParDefaut = () => ({ seuilSalaire: 25 });
 
 M.configParDefaut = function () {
   const groupes = [], categories = [];
@@ -320,6 +324,7 @@ M.configParDefaut = function () {
       { id: "revolut-epargne", banque: "revolut", nom: "Revolut épargne", type: "epargne" },
     ],
     groupes, categories, regles: [], basesInactives: [], soldes: [], budgets: [], objectifs: [], profilsLibres: [],
+    reglages: M.reglagesParDefaut(),
   };
 };
 
@@ -383,8 +388,10 @@ const BASE = [
   ...["pharma", "pharmacie"].map((m) => [m, C("sante", "Pharmacie")]),
   ...["dr ", "docteur", "medecin", "doctolib", "selarl", "dentiste", "kine"].map((m) => [m, C("sante", "Consultations médicales")]),
   ["mutuelle", C("sante", "Mutuelle"), "debit"],
-  ["mutuelle", ID_CATEGORIE.remboursement, "credit"],
-  ["cpam", ID_CATEGORIE.remboursement, "credit"],
+  // Remboursement de soins : déduit des dépenses de santé (contrat, nature « remboursement »), jamais un revenu.
+  ["mutuelle", C("sante", "Consultations médicales"), "credit"],
+  ["cpam", C("sante", "Consultations médicales"), "credit"],
+  ["ameli", C("sante", "Consultations médicales"), "credit"],
   ...["basic fit", "fitness park", "keepcool", "neoness", "on air", "myprotein"].map((m) => [m, C("sante", "Sport et fitness")]),
   ...["coiffure", "coiffeur", "barber", "hair"].map((m) => [m, C("sante", "Coiffeur")]),
   // Études
@@ -506,7 +513,9 @@ M.classer = classer;
 
 /* ---------------------------------------------------------------- Virements entre mes comptes */
 const TYPES_VIREMENT = /virement|ajout de fonds|transfer|topup|top up|recharge/;
-const INDICES_VIREMENT = /revolut|revolk|lcl|compte d epargne|savings|epargne|recharge sur apple pay|recharge|top up/;
+const INDICES_VIREMENT = /revolut|revolk|lcl|bourso|compte d epargne|savings|epargne|recharge sur apple pay|recharge|top up/;
+/** Indice dans le libellé seul (pas le type) : sert à repérer un virement interne dont la contrepartie manque. */
+const indiceInterne = (op) => INDICES_VIREMENT.test(normaliser(op.libelle));
 function ressembleVirement(op) {
   if (/^(dab|retrait dab|atm)$/.test(normaliser(op.type))) return false;
   return TYPES_VIREMENT.test(normaliser(op.type)) || INDICES_VIREMENT.test(normaliser(op.libelle));
@@ -539,6 +548,24 @@ M.detecterVirements = function (etat, ids) {
     liees++;
   }
   return liees;
+};
+
+/** Reprise (contrat C15) : une opération non classée qui annule une opération classée du même tiers (même compte,
+ *  montant opposé, 10 jours au plus) prend sa catégorie et reste « à vérifier ». Le couple est noté des deux côtés. */
+M.detecterReprises = function (etat, ids) {
+  const ops = Object.values(etat.operations);
+  const cibles = (ids ? ids.map((id) => etat.operations[id]).filter(Boolean) : ops).filter((o) => !o.categorie && !o.lien && o.source !== "manuel");
+  let n = 0;
+  for (const x of cibles) {
+    const tiers = normaliser(x.commercant || x.libelle);
+    const y = ops.filter((o) => o !== x && o.compte === x.compte && o.montant === -x.montant && o.categorie && !o.lien && !o.reprise
+      && normaliser(o.commercant || o.libelle) === tiers && M.ecartJours(o.dateValeur, x.dateValeur) <= 10)
+      .sort((a, b) => M.ecartJours(a.dateValeur, x.dateValeur) - M.ecartJours(b.dateValeur, x.dateValeur))[0];
+    if (!y) continue;
+    Object.assign(x, { categorie: y.categorie, source: "reprise", reprise: y.id, aValider: true, nature: M.natureDe(etat, y.categorie) });
+    y.reprise = x.id; n++;
+  }
+  return n;
 };
 
 M.delier = function (etat, id) {
@@ -602,19 +629,65 @@ M.actionImport = function (releve, idImport) {
 };
 
 /* ---------------------------------------------------------------- Soldes */
-/** Solde d'un compte : dernier solde de référence + opérations postérieures. Distingue vérifié et estimé. */
+const provenances = (o) => (Array.isArray(o.imports) ? [...o.imports] : o.import ? [o.import] : []);
+M.provenances = provenances;
+const ordreRefs = (a, b) => a.date.localeCompare(b.date) || (a.t || "").localeCompare(b.t || "");
+const RANG_STATUT = { atteste: 0, calcule: 1, ancien: 2, inconnu: 3 };
+
+/** Opérations postérieures à une référence (C16). Relevé : fin de journée, sauf opérations du même jour arrivées
+ *  par un import plus récent qui ne les contenait pas. Saisie : selon « inclut les opérations du jour ». */
+function apresReference(ref, ops) {
+  return ops.filter((o) => {
+    if (o.dateValeur > ref.date) return true;
+    if (o.dateValeur !== ref.date) return false;
+    if (ref.source === "saisie") return ref.inclutJour === false;
+    return !!ref.import && !provenances(o).includes(ref.import) && (o.importT || "") > (ref.t || "");
+  });
+}
+
+/** Solde d'un compte (C17) : référence + opérations postérieures. Statut en toutes lettres :
+ *  « atteste » (rien depuis la référence), « calcule » (référence + opérations), « ancien » (dernière info > 3 jours). */
 M.solde = function (etat, compteId, aujourdhui) {
-  const refs = etat.config.soldes.filter((s) => s.compte === compteId).sort((a, b) => a.date.localeCompare(b.date) || (a.t || "").localeCompare(b.t || ""));
+  const refs = etat.config.soldes.filter((s) => s.compte === compteId).sort(ordreRefs);
   const ref = refs.at(-1);
   const ops = Object.values(etat.operations).filter((o) => o.compte === compteId);
   if (!ref) {
     if (!ops.length) return null;
-    return { montant: null, inconnu: true, date: null };
+    return { montant: null, inconnu: true, date: null, statut: "inconnu", ids: ops.map((o) => o.id) };
   }
-  const apres = ops.filter((o) => o.dateValeur > ref.date || (o.dateValeur === ref.date && ref.import && o.import !== ref.import && o.importT > ref.t));
+  const apres = apresReference(ref, ops).sort((a, b) => a.dateValeur.localeCompare(b.dateValeur));
   const montant = ref.montant + apres.reduce((t, o) => t + o.montant, 0);
-  const age = aujourdhui ? Math.round(jours(aujourdhui) - jours(ref.date)) : 0;
-  return { montant, verifie: apres.length === 0, date: ref.date, source: ref.source, age, ancien: age > 7, mouvementsDepuis: apres.length };
+  const derniere = [ref.date, ...apres.map((o) => o.dateValeur)].sort().at(-1);
+  const age = aujourdhui ? Math.max(0, Math.round(jours(aujourdhui) - jours(derniere))) : 0;
+  const statut = age > 3 ? "ancien" : apres.length ? "calcule" : "atteste";
+  return { montant, statut, verifie: statut === "atteste", date: derniere, dateReference: ref.date, reference: ref, source: ref.source,
+    age, ancien: statut === "ancien", mouvementsDepuis: apres.length, ids: apres.map((o) => o.id), ecart: ref.ecart || 0 };
+};
+
+/** Patrimoine (C19) : somme des soldes des comptes suivis ; son statut est le moins bon de ses composants. */
+M.patrimoine = function (etat, aujourdhui) {
+  const comptes = etat.config.comptes.filter((c) => !c.archive).map((c) => ({ compte: c, solde: M.solde(etat, c.id, aujourdhui) })).filter((x) => x.solde);
+  const connus = comptes.filter((x) => x.solde.montant != null);
+  const statut = comptes.reduce((pire, x) => (RANG_STATUT[x.solde.statut] > RANG_STATUT[pire] ? x.solde.statut : pire), "atteste");
+  return { montant: connus.reduce((t, x) => t + x.solde.montant, 0), statut: comptes.length ? statut : "inconnu", comptes,
+    complet: connus.length === comptes.length, date: connus.map((x) => x.solde.date).sort()[0] || null };
+};
+
+/** Contrôle de cohérence (C20) : entre deux références d'un compte, ancienne + opérations = nouvelle, au centime. */
+M.controles = function (etat) {
+  const res = [];
+  for (const c of etat.config.comptes) {
+    const refs = etat.config.soldes.filter((s) => s.compte === c.id).sort(ordreRefs);
+    const ops = Object.values(etat.operations).filter((o) => o.compte === c.id);
+    for (let i = 1; i < refs.length; i++) {
+      const a = refs[i - 1], b = refs[i];
+      const dans = ops.filter((o) => (a.inclutJour === false ? o.dateValeur >= a.date : o.dateValeur > a.date)
+        && (b.inclutJour === false ? o.dateValeur < b.date : o.dateValeur <= b.date));
+      const attendu = a.montant + dans.reduce((t, o) => t + o.montant, 0);
+      res.push({ compte: c.id, du: a.date, au: b.date, depart: a.montant, mouvements: attendu - a.montant, attendu, reel: b.montant, ecart: b.montant - attendu, ids: dans.map((o) => o.id) });
+    }
+  }
+  return res;
 };
 
 /** Solde jour par jour (pour les courbes), recalé sur chaque solde de référence. */
@@ -663,23 +736,29 @@ M.appliquer = function (etat, action) {
       const { nouvelles, doublons } = M.preparerImport(etat, { operations: action.operations });
       const ecarts = [];
       for (const op of nouvelles) {
-        Object.assign(op, { import: action.import.id, importT: t, categorie: null, source: null, nature: null, lien: null, aValider: true, note: "" });
+        Object.assign(op, { import: action.import.id, imports: [action.import.id], importT: t, categorie: null, source: null, nature: null, lien: null, aValider: true, note: "" });
         ops[op.id] = op;
+      }
+      // Provenance multiple (C10) : une opération déjà connue garde la trace de chaque import qui l'a relue.
+      for (const d of doublons) {
+        const o = ops[d.id];
+        if (o) { o.imports = provenances(o); if (!o.imports.includes(action.import.id)) o.imports.push(action.import.id); }
       }
       const ids = nouvelles.map((o) => o.id);
       M.detecterVirements(etat, ids);
       const rs = regles();
       for (const id of ids) classer(etat, ops[id], rs);
-      for (const s of action.soldes || []) {
-        const avant = M.solde(etat, s.compte);
+      M.detecterReprises(etat, ids);
+      // Import partiel (C12) : un relevé qui ne tombe pas juste n'apporte pas de solde de référence.
+      const partiel = action.import.controle && action.import.controle.ok === false;
+      for (const s of partiel ? [] : action.soldes || []) {
+        const calcule = M.soldeAu(etat, s.compte, s.date, action.import.id);
+        const ecart = calcule != null && calcule !== s.montant ? s.montant - calcule : 0;
         cfg.soldes = cfg.soldes.filter((x) => !(x.compte === s.compte && x.date === s.date && x.source === "releve"));
-        cfg.soldes.push({ id: "solde_" + empreinte(action.import.id + s.compte), compte: s.compte, date: s.date, montant: s.montant, source: "releve", import: action.import.id, t });
-        if (avant && avant.montant != null && avant.date && avant.date <= s.date) {
-          const calcule = M.soldeAu(etat, s.compte, s.date, action.import.id);
-          if (calcule != null && calcule !== s.montant) ecarts.push({ compte: s.compte, date: s.date, ecart: s.montant - calcule });
-        }
+        cfg.soldes.push({ id: "solde_" + empreinte(action.import.id + s.compte), compte: s.compte, date: s.date, montant: s.montant, source: "releve", import: action.import.id, t, inclutJour: true, ecart });
+        if (ecart) ecarts.push({ compte: s.compte, date: s.date, ecart });
       }
-      etat.imports.push({ ...action.import, t, ajoutees: ids.length, doublons: doublons.length, ecarts });
+      etat.imports.push({ ...action.import, t, ajoutees: ids.length, doublons: doublons.length, ecarts, soldeIgnore: !!partiel });
       out.ids = ids; out.doublons = doublons.length; out.ecarts = ecarts;
       ent.resume = `Import ${action.import.fichier || ""} : ${ids.length} opération(s) ajoutée(s), ${doublons.length} déjà connue(s)`;
       ent.details = { import: action.import.id, ajoutees: ids.length, doublons: doublons.length };
@@ -688,15 +767,23 @@ M.appliquer = function (etat, action) {
     case "supprimer-import": {
       const imp = etat.imports.find((i) => i.id === action.importId);
       if (!imp) { ent.resume = "Import introuvable"; break; }
-      const ids = Object.keys(ops).filter((id) => ops[id].import === action.importId);
+      // C10 : seules les opérations qu'aucun autre import ne contient disparaissent ; les autres gardent leurs corrections.
+      const ids = [], gardees = [];
+      for (const o of Object.values(ops)) {
+        const p = provenances(o);
+        if (!p.includes(action.importId)) continue;
+        const reste = p.filter((x) => x !== action.importId);
+        if (reste.length) { o.imports = reste; if (o.import === action.importId) o.import = reste[0]; gardees.push(o.id); }
+        else ids.push(o.id);
+      }
       const lies = ids.map((id) => ops[id].lien).filter((l) => l && !ids.includes(l));
       for (const id of ids) delete ops[id];
       const rs = regles();
       for (const l of lies) { const o = ops[l]; if (o) { o.lien = null; o.source = null; o.categorie = null; classer(etat, o, rs); } }
       cfg.soldes = cfg.soldes.filter((s) => s.import !== action.importId);
       etat.imports = etat.imports.filter((i) => i.id !== action.importId);
-      ent.resume = `Import ${imp.fichier || ""} supprimé : ${ids.length} opération(s) retirée(s)`;
-      ent.details = { import: action.importId, retirees: ids.length, ids };
+      ent.resume = `Import ${imp.fichier || ""} supprimé : ${ids.length} opération(s) retirée(s)` + (gardees.length ? `, ${gardees.length} gardée(s) car présentes dans un autre import` : "");
+      ent.details = { import: action.importId, retirees: ids.length, ids, gardees };
       out.ids = ids;
       break;
     }
@@ -761,11 +848,27 @@ M.appliquer = function (etat, action) {
       break;
     }
     case "solde": {
-      const s = { id: action.id || "solde_" + empreinte(action.compte + action.date + action.montant), compte: action.compte, date: action.date, montant: action.montant, source: "saisie", t: action.t };
+      // C16 : la saisie dit si le montant inclut déjà les opérations du jour. C18 : l'écart avec le calcul est gardé.
+      const inclutJour = action.inclutJour !== false;
+      const s = { id: action.id || "solde_" + empreinte(action.compte + action.date + action.montant), compte: action.compte, date: action.date, montant: action.montant, source: "saisie", t: action.t, inclutJour };
       cfg.soldes = cfg.soldes.filter((x) => x.id !== s.id && !(x.compte === s.compte && x.date === s.date && x.source === "saisie"));
+      const calcule = M.soldeAu(etat, s.compte, s.date, null, inclutJour);
+      s.ecart = calcule != null && calcule !== s.montant ? s.montant - calcule : 0;
       cfg.soldes.push(s);
       ent.resume = `Solde saisi : ${M.compte(etat, action.compte)?.nom || action.compte} au ${action.date}`;
       ent.details = { compte: action.compte, montant: action.montant };
+      break;
+    }
+    case "rattacher": {  // C6 : mois de rattachement choisi à la main (null = règle automatique)
+      for (const id of action.ids) { const o = ops[id]; if (!o) continue; o.moisForce = action.mois || null; out.ids.push(id); }
+      ent.resume = action.mois ? `${out.ids.length} opération(s) comptée(s) en ${action.mois}` : `${out.ids.length} opération(s) : mois automatique`;
+      ent.details = { ids: out.ids, mois: action.mois || null };
+      break;
+    }
+    case "reglages": {
+      ent.details = { avant: { ...cfg.reglages }, apres: action.reglages };
+      cfg.reglages = { ...M.reglagesParDefaut(), ...cfg.reglages, ...action.reglages };
+      ent.resume = "Réglages de calcul modifiés";
       break;
     }
     case "supprimer-solde": {
@@ -803,6 +906,7 @@ M.appliquer = function (etat, action) {
     case "reclasser": {  // repasser les règles sur tout ce qui n'est pas corrigé à la main
       const rs = regles();
       for (const o of Object.values(ops)) if (classer(etat, o, rs)) out.ids.push(o.id);
+      M.detecterReprises(etat);
       ent.resume = `${out.ids.length} opération(s) reclassée(s)`;
       break;
     }
@@ -871,10 +975,12 @@ M.appliquer = function (etat, action) {
 };
 
 /** Solde calculé à une date, à partir de la référence précédente (pour repérer un écart avec un relevé). */
-M.soldeAu = function (etat, compteId, date, sauf) {
-  const ref = etat.config.soldes.filter((s) => s.compte === compteId && s.date < date && s.import !== sauf).sort((a, b) => a.date.localeCompare(b.date)).at(-1);
+M.soldeAu = function (etat, compteId, date, sauf, inclutJour = true) {
+  const ref = etat.config.soldes.filter((s) => s.compte === compteId && s.date < date && (!sauf || s.import !== sauf)).sort(ordreRefs).at(-1);
   if (!ref) return null;
-  return ref.montant + Object.values(etat.operations).filter((o) => o.compte === compteId && o.dateValeur > ref.date && o.dateValeur <= date).reduce((t, o) => t + o.montant, 0);
+  const debut = ref.inclutJour === false ? (o) => o.dateValeur >= ref.date : (o) => o.dateValeur > ref.date;
+  const fin = inclutJour ? (o) => o.dateValeur <= date : (o) => o.dateValeur < date;
+  return ref.montant + Object.values(etat.operations).filter((o) => o.compte === compteId && debut(o) && fin(o)).reduce((t, o) => t + o.montant, 0);
 };
 
 /** Applique une règle aux opérations déjà importées (jamais aux corrections manuelles ni aux virements liés). */
@@ -938,16 +1044,17 @@ M.compilerRecherche = function (etat, requete) {
       tests.push((o) => { const a = Math.abs(o.montant); return entier ? Math.floor(a / 100) === v / 100 || normaliser(o.libelle).includes(m) : a === v; });
     } else if ((r = brut.match(/^(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?$/))) {
       const j = r[1].padStart(2, "0"), mo = r[2].padStart(2, "0"), a = r[3] ? (r[3].length === 2 ? "20" + r[3] : r[3]) : null;
-      tests.push((o) => o.date.slice(5) === `${mo}-${j}` && (!a || o.date.startsWith(a)));
+      tests.push((o) => o.dateValeur.slice(5) === `${mo}-${j}` && (!a || o.dateValeur.startsWith(a)));
     } else if (/^\d{4}$/.test(brut)) {
-      tests.push((o) => o.date.startsWith(brut) || normaliser(o.libelle).includes(brut));
+      tests.push((o) => o.dateValeur.startsWith(brut) || normaliser(o.libelle).includes(brut));
     } else if (m.length >= 3 && MOIS.some((x) => x.startsWith(m))) {
       const n = String(MOIS.findIndex((x) => x.startsWith(m)) + 1).padStart(2, "0");
-      tests.push((o) => o.date.slice(5, 7) === n || normaliser(o.commercant).includes(m));
+      tests.push((o) => o.dateValeur.slice(5, 7) === n || normaliser(o.commercant).includes(m));
     } else if (m === "a" && normaliser(mots[i + 1] || "") === "valider") { i++; tests.push((o) => o.aValider); }
     else if (m === "valider" || m === "avalider") tests.push((o) => o.aValider);
     else if (m === "non" && normaliser(mots[i + 1] || "").startsWith("class")) { i++; tests.push((o) => !o.categorie); }
-    else if (m === "interne" || m === "internes") tests.push((o) => o.nature === "interne");
+    else if (m === "interne" || m === "internes") tests.push((o) => M.natureOp(etat, o) === "interne");
+    else if (m === "rapprocher") tests.push((o) => M.natureOp(etat, o) === "rapprocher");
     else if (m) {
       const idsCats = new Set(cats.filter((c) => normaliser(c.nom).includes(m)).map((c) => c.id));
       const idsGrps = new Set(grps.filter((g) => normaliser(g.nom).includes(m)).map((g) => g.id));
@@ -974,42 +1081,106 @@ M.periode = function (nom, aujourdhui, du, au) {
   }
 };
 
-/* ---------------------------------------------------------------- Calculs du tableau de bord */
-/** Totaux d'un ensemble d'opérations : dépenses (positives), revenus, épargne nette, par groupe et catégorie. */
-M.totaux = function (etat, ops) {
-  const t = { depenses: 0, revenus: 0, epargne: 0, parGroupe: {}, parCategorie: {}, nonClassees: 0, salaire: 0 };
-  for (const o of ops) {
-    if (o.nature === "depense" || (!o.nature && o.montant < 0)) {
-      t.depenses -= o.montant;
-      const c = o.categorie ? M.categorie(etat, o.categorie) : null;
-      const g = c ? c.groupe : "_aucun";
-      t.parGroupe[g] = (t.parGroupe[g] || 0) - o.montant;
-      t.parCategorie[o.categorie || "_aucune"] = (t.parCategorie[o.categorie || "_aucune"] || 0) - o.montant;
-      if (!o.categorie) t.nonClassees++;
-    } else if (o.nature === "revenu" || (!o.nature && o.montant > 0)) {
-      t.revenus += o.montant;
-      if (o.categorie === ID_CATEGORIE.salaire) t.salaire += o.montant;
-      if (o.categorie === ID_CATEGORIE.interets) t.epargne += o.montant;
-      t.parCategorie[o.categorie || "_aucune"] = (t.parCategorie[o.categorie || "_aucune"] || 0) + o.montant;
-    }
-    if (o.nature === "interne" && M.compte(etat, o.compte)?.type === "epargne") t.epargne += o.montant;
+/* ---------------------------------------------------------------- Calculs : le seul module qui produit des chiffres */
+// Toutes les vues lisent leurs chiffres ici (contrat, section 5). Chaque indicateur renvoie { valeur, ids } :
+// la valeur en centimes et la liste exacte des opérations qui la composent, pour « justifier » chaque nombre.
+
+const reglages = (etat) => ({ ...M.reglagesParDefaut(), ...(etat.config.reglages || {}) });
+M.reglages = reglages;
+
+/** Date qui range l'opération dans un mois (C5, C6) : date de débit ; un salaire versé à partir du seuil (25 par
+ *  défaut) compte pour le mois suivant ; un rattachement choisi à la main l'emporte. Ne touche jamais les soldes. */
+M.dateRattachement = function (etat, o) {
+  if (o.moisForce) return o.moisForce + "-01";
+  const d = o.dateValeur || o.date;
+  if (o.categorie === ID_CATEGORIE.salaire && o.montant > 0 && Number(d.slice(8, 10)) >= reglages(etat).seuilSalaire) {
+    const [a, m] = d.split("-").map(Number);
+    return new Date(Date.UTC(a, m, 1)).toISOString().slice(0, 10);
   }
-  return t;
+  return d;
+};
+M.moisDe = (etat, o) => M.dateRattachement(etat, o).slice(0, 7);
+/** Le rattachement diffère-t-il du mois de débit ? (pour afficher « compté en novembre ») */
+M.decale = (etat, o) => M.moisDe(etat, o) !== (o.dateValeur || o.date).slice(0, 7);
+
+/** Nature d'une opération (contrat, section 3). Exactement une parmi : depense, remboursement, revenu, interne,
+ *  rapprocher (virement sans contrepartie), hors (vers un compte à moi non suivi). Calculée, jamais devinée ailleurs. */
+M.natureOp = function (etat, o) {
+  if (o.lien) return "interne";
+  const type = o.categorie ? M.natureDe(etat, o.categorie) : null;
+  if (o.categorie === ID_CATEGORIE.nonSuivi) return "hors";
+  if (type === "interne") return o.source === "manuel" ? "interne" : "rapprocher";
+  if (type === "depense") return o.montant < 0 ? "depense" : "remboursement";
+  if (type === "revenu") return "revenu";
+  if (o.source !== "manuel" && indiceInterne(o)) return "rapprocher";  // C14
+  return o.montant < 0 ? "depense" : "revenu";  // non classée : comptée, et signalée « à vérifier »
+};
+M.aRapprocher = (etat, o) => M.natureOp(etat, o) === "rapprocher";
+
+const seau = () => ({ valeur: 0, ids: [] });
+const verser = (b, o, v) => { b.valeur += v; b.ids.push(o.id); };
+
+/** Indicateurs d'un ensemble d'opérations (déjà filtré sur la période par M.moisDe). Montants en centimes. */
+M.indicateurs = function (etat, ops) {
+  const r = {
+    depenses: seau(), remboursements: seau(), revenus: seau(), salaire: seau(), interets: seau(), aide: seau(), autresRevenus: seau(),
+    misDeCote: seau(), internes: seau(), aRapprocher: { ...seau(), nombre: 0 }, horsPerimetre: seau(), aVerifier: { ...seau(), nombre: 0 },
+    nonClassees: { ...seau(), nombre: 0 }, parGroupe: {}, parCategorie: {}, revenusParCategorie: {},
+  };
+  const epargne = new Set(etat.config.comptes.filter((c) => c.type === "epargne").map((c) => c.id));
+  for (const o of ops) {
+    const n = M.natureOp(etat, o);
+    if (epargne.has(o.compte)) verser(r.misDeCote, o, o.montant);
+    if (n === "depense" || n === "remboursement") {
+      const v = -o.montant;  // une dépense est positive, un remboursement la diminue
+      verser(r.depenses, o, v);
+      if (n === "remboursement") verser(r.remboursements, o, o.montant);
+      const c = o.categorie ? M.categorie(etat, o.categorie) : null;
+      const g = c ? c.groupe : "_aucun", k = o.categorie || "_aucune";
+      verser(r.parGroupe[g] ||= seau(), o, v);
+      verser(r.parCategorie[k] ||= seau(), o, v);
+    } else if (n === "revenu") {
+      verser(r.revenus, o, o.montant);
+      const k = o.categorie || "_aucune";
+      verser(r.revenusParCategorie[k] ||= seau(), o, o.montant);
+      if (o.categorie === ID_CATEGORIE.salaire) verser(r.salaire, o, o.montant);
+      else if (o.categorie === ID_CATEGORIE.interets) verser(r.interets, o, o.montant);
+      else if (o.categorie === ID_CATEGORIE.aide) verser(r.aide, o, o.montant);
+      else verser(r.autresRevenus, o, o.montant);
+    } else if (n === "interne") verser(r.internes, o, o.montant);
+    else if (n === "rapprocher") { verser(r.aRapprocher, o, o.montant); r.aRapprocher.nombre++; }
+    else if (n === "hors") verser(r.horsPerimetre, o, o.montant);
+    if (!o.categorie && !o.lien && n !== "rapprocher") { verser(r.nonClassees, o, o.montant); r.nonClassees.nombre++; }
+    if ((o.aValider || o.doublonPossible) && n !== "rapprocher") { verser(r.aVerifier, o, Math.abs(o.montant)); r.aVerifier.nombre++; }
+  }
+  r.resultat = { valeur: r.revenus.valeur - r.depenses.valeur, ids: [...r.revenus.ids, ...r.depenses.ids] };
+  r.tauxEpargne = { valeur: r.revenus.valeur > 0 ? r.resultat.valeur / r.revenus.valeur : null, ids: r.resultat.ids };
+  return r;
 };
 
-/** Dépenses et revenus mois par mois (12 derniers mois par défaut). */
+/** Opérations rattachées à une période (bornes incluses, dates ISO). */
+M.opsPeriode = (etat, ops, du, au) => ops.filter((o) => { const d = M.dateRattachement(etat, o); return d >= du && d <= au; });
+
+/** Compatibilité : ancien format des totaux, dérivé des indicateurs (mêmes chiffres partout). */
+M.totaux = function (etat, ops) {
+  const r = M.indicateurs(etat, ops);
+  const plat = (o) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, v.valeur]));
+  return { depenses: r.depenses.valeur, revenus: r.revenus.valeur, epargne: r.misDeCote.valeur, parGroupe: plat(r.parGroupe),
+    parCategorie: { ...plat(r.parCategorie), ...plat(r.revenusParCategorie) }, nonClassees: r.nonClassees.nombre, salaire: r.salaire.valeur };
+};
+
+/** Dépenses et revenus mois par mois, par mois de rattachement, avec les mêmes formules que M.indicateurs. */
 M.parMois = function (etat, ops, nbMois, aujourdhui) {
   const fin = aujourdhui.slice(0, 7);
   const [a, m] = fin.split("-").map(Number);
   const mois = [];
   for (let i = nbMois - 1; i >= 0; i--) { const d = new Date(Date.UTC(a, m - 1 - i, 1)); mois.push(d.toISOString().slice(0, 7)); }
-  const res = mois.map((mo) => ({ mois: mo, depenses: 0, revenus: 0 }));
-  const pos = new Map(mois.map((mo, i) => [mo, i]));
-  for (const o of ops) {
-    const i = pos.get(o.date.slice(0, 7)); if (i == null) continue;
-    if (o.nature === "depense") res[i].depenses -= o.montant; else if (o.nature === "revenu") res[i].revenus += o.montant;
-  }
-  return res;
+  const groupes = new Map(mois.map((mo) => [mo, []]));
+  for (const o of ops) groupes.get(M.moisDe(etat, o))?.push(o);
+  return mois.map((mo) => {
+    const r = M.indicateurs(etat, groupes.get(mo));
+    return { mois: mo, depenses: r.depenses.valeur, revenus: r.revenus.valeur, resultat: r.resultat.valeur, misDeCote: r.misDeCote.valeur };
+  });
 };
 
 /** Catégories les plus utilisées (pour le haut du sélecteur). */
@@ -1054,6 +1225,25 @@ M.depuisFichiers = function (fichiers) {
   if (fichiers["imports.json"]) etat.imports = fichiers["imports.json"].imports || [];
   if (fichiers["journal.json"]) etat.journal = fichiers["journal.json"].journal || [];
   for (const [nom, f] of Object.entries(fichiers)) if (/^operations-\d{4}\.json$/.test(nom)) for (const o of f.operations || []) etat.operations[o.id] = o;
+  if (fichiers["config.json"] && (fichiers["config.json"].version || 1) < VERSION) M.migrer(etat);
+  toucher(etat);
+  return etat;
+};
+
+/** Migration 1 → 2, sans aucune suppression : catégories par défaut manquantes ajoutées, provenance initialisée,
+ *  réglages par défaut, règles rejouées sur les opérations non corrigées à la main. Le coffre garde une copie
+ *  de la version 1 (PloutosCoffre) avant le premier envoi. Idempotente. */
+M.migrer = function (etat) {
+  const cfg = etat.config, def = M.configParDefaut();
+  for (const g of def.groupes) if (!cfg.groupes.some((x) => x.id === g.id)) cfg.groupes.push({ ...g, ordre: cfg.groupes.length });
+  for (const c of def.categories) if (!cfg.categories.some((x) => x.id === c.id)) cfg.categories.push(c);
+  cfg.reglages = { ...M.reglagesParDefaut(), ...(cfg.reglages || {}) };
+  for (const o of Object.values(etat.operations)) o.imports = provenances(o);
+  toucher(etat);
+  const rs = M.reglesActives(cfg);
+  for (const o of Object.values(etat.operations)) classer(etat, o, rs);
+  M.detecterReprises(etat);
+  cfg.version = VERSION;
   toucher(etat);
   return etat;
 };

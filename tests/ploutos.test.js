@@ -113,7 +113,7 @@ test("règles de base : le plus précis l'emporte, le sens compte", () => {
   assert.equal(cat("uber trip"), "transport-taxi-vtc");
   assert.equal(cat("boulangerie max"), "alimentation-boulangerie");
   assert.equal(cat("cb boulanger 0"), "shopping-electronique");
-  assert.equal(cat("mutuelle"), M.ID_CATEGORIE.remboursement);
+  assert.equal(cat("mutuelle"), "sante-consultations-medicales");  // contrat T8 : remboursement déduit de la santé
   assert.equal(cat("retrait du"), M.ID_CATEGORIE.especes);
   assert.equal(cat("netflix"), "abonnements-streaming-video");
   assert.equal(cat("frais d abonnement"), "finances-frais-bancaires");
@@ -189,7 +189,8 @@ test("soldes : vérifié puis estimé après une saisie", () => {
   importer(etat, lire(LCL));
   let s = M.solde(etat, "lcl-courant", "2026-02-15");
   assert.equal(s.montant, 43100);
-  assert.ok(s.verifie);
+  assert.equal(s.mouvementsDepuis, 0);
+  assert.equal(s.statut, "ancien");  // contrat C17 : plus de 3 jours sans information
   assert.ok(s.ancien);
   M.appliquer(etat, { type: "solde", compte: "revolut-epargne", date: "2026-01-01", montant: 1000, id: "x" });
   assert.equal(M.solde(etat, "revolut-epargne", "2026-01-02").montant, 1000);
@@ -215,11 +216,15 @@ function fauxGithub() {
   const f = async (url, o = {}) => {
     const chemin = url.replace(/^https:\/\/api\.github\.com\/repos\/[^/]+\/[^/]+/, "");
     appels.push((o.method || "GET") + " " + chemin);
-    if (chemin === "/contents/") return fichiers.size ? rep(200, [...fichiers].map(([name, v]) => ({ name, sha: v.sha, type: "file" }))) : rep(404, { message: "This repository is empty." });
+    if (chemin === "/contents/") {  // comme le vrai : la racine liste les dossiers comme « dir »
+      const racine = [...fichiers].map(([name, v]) => (name.includes("/") ? { name: name.split("/")[0], type: "dir" } : { name, sha: v.sha, type: "file" }));
+      return fichiers.size ? rep(200, racine) : rep(404, { message: "This repository is empty." });
+    }
     let m;
     if ((m = chemin.match(/^\/git\/blobs\/(.+)$/))) { const v = [...fichiers.values()].find((x) => x.sha === m[1]); return rep(200, { content: v.contenu, encoding: "base64" }); }
     if ((m = chemin.match(/^\/contents\/(.+)$/))) {
       const nom = m[1], corps = JSON.parse(o.body), actuel = fichiers.get(nom);
+      if (actuel && !corps.sha && o.method !== "DELETE") return rep(422, { message: "sha wasn't supplied" });
       if (actuel && corps.sha !== actuel.sha) return rep(409, { message: "sha mismatch" });
       if (o.method === "DELETE") { fichiers.delete(nom); return rep(200, {}); }
       const sha = "sha" + ++compteur;
@@ -293,6 +298,42 @@ test("coffre : premier contact avec un dépôt déjà rempli", async () => {
   assert.equal((await b2.synchroniser()).etat, "conflit-initial");
   await b2.resoudreConflitInitial("en-ligne");
   assert.equal(Object.keys(b2.etat.operations).length, 13);
+});
+
+test("coffre : migration 1 → 2 avec copie de sauvegarde de la version 1 dans le dépôt", async () => {
+  const cle = await deriverCle("phrase de test du coffre", 1000);
+  const gh = fauxGithub();
+  const distant = { jeton: "x", depot: "moi/coffre" };
+  // Un coffre écrit par l'ancienne version (1)
+  const ancien = M.etatVide();
+  M.appliquer(ancien, { ...M.actionImport(lire(LCL), "i1"), id: "a1", t: "2026-02-01T10:00:00Z" });
+  const v1 = {};
+  for (const [nom, obj] of Object.entries(M.versFichiers(ancien))) {
+    obj.version = 1;
+    for (const o of obj.operations || []) delete o.imports;
+    const env = await sceller(cle, JSON.stringify(obj));
+    v1[nom] = env;
+    gh.fichiers.set(nom, { sha: "v1-" + nom, contenu: Buffer.from(JSON.stringify(env)).toString("base64") });
+  }
+  const c = new Coffre({ cle, stockage: memoire(), distant, fetch: gh.fetch });
+  await c.charger();
+  await c.synchroniser();
+  assert.ok(Object.values(c.etat.operations).every((o) => Array.isArray(o.imports)), "migration en mémoire");
+  await c.faire({ type: "note", idOp: Object.keys(c.etat.operations)[0], note: "test" });
+  clearTimeout(c.minuteur);
+  assert.equal((await c.synchroniser()).etat, "pret");
+  for (const nom of Object.keys(v1)) {
+    const copie = gh.fichiers.get("sauvegarde-v1/" + nom);
+    assert.ok(copie, "copie de " + nom);
+    assert.deepEqual(JSON.parse(Buffer.from(copie.contenu, "base64").toString()), v1[nom], "copie identique, toujours chiffrée");
+  }
+  const config = JSON.parse(await ouvrirEnveloppe(cle, JSON.parse(Buffer.from(gh.fichiers.get("config.json").contenu, "base64").toString())));
+  assert.equal(config.version, 2);
+  // Deuxième synchro : pas de nouvelle copie, rien d'écrasé
+  const nb = gh.fichiers.size;
+  await c.faire({ type: "note", idOp: Object.keys(c.etat.operations)[0], note: "encore" }); clearTimeout(c.minuteur);
+  await c.synchroniser();
+  assert.equal(gh.fichiers.size, nb);
 });
 
 test("classement par l'IA : seulement les non classées, règles créées pour les réponses sûres", () => {

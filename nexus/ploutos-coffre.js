@@ -78,6 +78,7 @@ function github({ jeton, depot }, fetchFn) {
 }
 
 /* ---------------------------------------------------------------- Le coffre */
+const versionDe = (clair) => { try { return JSON.parse(clair).version || 1; } catch { return 1; } };
 const ORDRE = (nom) => (nom.startsWith("operations-") ? 0 : nom === "config.json" ? 1 : nom === "imports.json" ? 2 : 3);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
 
@@ -140,6 +141,12 @@ class Coffre {
 
   /** Sans dépôt : l'état courant devient la base locale (pas d'historique à rejouer). */
   async compacter() {
+    // Coffre local d'une version antérieure : copie intégrale gardée sur l'appareil avant la première réécriture.
+    if (Object.values(this.base).some((f) => f.clair && versionDe(f.clair) < M.VERSION) && !(await this.stockage.lire("sauvegardeLocale"))) {
+      const brut = {};
+      for (const [nom, f] of Object.entries(this.base)) if (f.env) brut[nom] = { sha: f.sha, env: f.env };
+      await this.stockage.ecrire("sauvegardeLocale", { t: new Date().toISOString(), base: brut });
+    }
     const nouveaux = M.versFichiers(this.etat);
     const base = {};
     for (const [nom, obj] of Object.entries(nouveaux)) {
@@ -200,6 +207,7 @@ class Coffre {
         const aEnvoyer = Object.keys(nouveaux).filter((n) => !this.base[n] || !this.base[n].sha || this.base[n].clair !== nouveaux[n]).sort((a, b) => ORDRE(a) - ORDRE(b));
         const aRetirer = Object.keys(this.base).filter((n) => this.base[n].sha && !(n in nouveaux));
         const message = `PLOUTOS : mise à jour du coffre (${this.appareil})`;
+        if (aEnvoyer.length) await this.sauvegarderAnciennes(distant);
         try {
           for (const nom of aEnvoyer) {
             const env = await sceller(this.cle, nouveaux[nom]);
@@ -225,6 +233,22 @@ class Coffre {
       this.statut = { ...this.statut, etat: horsLigne ? "hors-ligne" : "erreur", erreur: e.code === "cle" ? e.message
         : e.statut === 401 || e.statut === 403 || e.statut === 404 ? "GitHub refuse l'accès au coffre : vérifie le jeton PLOUTOS_TOKEN et le dépôt ploutos-coffre." : e.message, code: e.code };
       return this.statut;
+    }
+  }
+
+  /** Avant le premier envoi au format actuel, les fichiers d'une version antérieure sont copiés tels quels
+   *  (toujours chiffrés) dans « sauvegarde-v<N>/ » du dépôt : la migration n'écrase jamais rien sans copie. */
+  async sauvegarderAnciennes(distant) {
+    const anciens = Object.entries(this.base).filter(([nom, f]) => f.sha && f.env && f.clair && versionDe(f.clair) < M.VERSION && distant[nom]);
+    if (!anciens.length) return;
+    const fait = new Set((await this.stockage.lire("sauvegardes")) || []);
+    for (const [nom, f] of anciens) {
+      const cible = `sauvegarde-v${versionDe(f.clair)}/${nom}`;
+      if (fait.has(cible)) continue;
+      try { await this.gh.ecrire(cible, JSON.stringify(f.env), undefined, `PLOUTOS : copie de sauvegarde avant migration (${nom})`); }
+      catch (e) { if (e.statut !== 422) throw e; }  // 422 : la copie existe déjà (faite depuis un autre appareil)
+      fait.add(cible);
+      await this.stockage.ecrire("sauvegardes", [...fait]);
     }
   }
 
