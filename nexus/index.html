@@ -858,7 +858,8 @@ function avis(texte, erreur) {
   clearTimeout(avis.minuteur); avis.minuteur = setTimeout(() => { a.hidden = true; }, 4200);
 }
 async function cocher(t, bouton) {
-  if (!t.id || bouton.disabled) return;
+  if (bouton.disabled) return;
+  if (!t.id) return avis("Données d'avant la mise à jour : touche ACTUALISER, puis réessaie.", true);
   const rangee = bouton.closest(".rangee");
   bouton.disabled = true; rangee.classList.add("faite");
   try {
