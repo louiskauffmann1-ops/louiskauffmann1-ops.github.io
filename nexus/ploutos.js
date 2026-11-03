@@ -97,10 +97,9 @@ async function faire(action, { redessiner = true } = {}) {
 }
 
 /* ---------------------------------------------------------------- Structure */
-const ONGLETS = [
-  ["apercu", "Vue d'ensemble"], ["operations", "Opérations"], ["comptes", "Comptes"], ["importer", "Importer"], ["reglages", "Réglages"],
-  ["budgets", "Budgets", 2], ["epargne", "Épargne", 3], ["analyses", "Analyses", 4],
-];
+// Peu d'onglets, des mots simples. Budgets et Épargne apparaîtront quand ils seront prêts ; Importer et Réglages sont des boutons.
+const ONGLETS = [["apercu", "Accueil"], ["operations", "Opérations"], ["comptes", "Comptes"]];
+const MOIS_NOMS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
 function vue() {
   if (!P.racine) {
     P.racine = el("div", { class: "pl" });
@@ -119,13 +118,16 @@ function aller(onglet, filtres) {
 function dessiner() {
   if (!P.racine) return;
   const barre = el("nav", { class: "pl-onglets", "aria-label": "Sections de PLOUTOS" },
-    ONGLETS.map(([id, nom, etape]) => {
+    ONGLETS.map(([id, nom]) => {
       const n = id === "operations" && P.etat ? Object.values(P.etat.operations).filter((o) => o.aValider).length : 0;
-      return el("button", { type: "button", class: "pl-onglet", "aria-current": P.onglet === id ? "page" : null, disabled: !!etape || P.phase !== "pret",
-        title: etape ? "Arrive à l'étape " + etape : null, onclick: () => aller(id) },
-        nom, etape ? el("small", null, "ÉTAPE " + etape) : null, n ? el("b", { class: "pl-pastille" }, String(n)) : null);
+      return el("button", { type: "button", class: "pl-onglet", "aria-current": P.onglet === id ? "page" : null, disabled: P.phase !== "pret", onclick: () => aller(id) },
+        nom, n ? el("b", { class: "pl-pastille", title: n + " à vérifier" }, String(n)) : null);
     }));
-  const tete = el("div", { class: "pl-tete" }, barre, el("button", { type: "button", class: "pl-statut", id: "pl-statut" }));
+  const pret = P.phase === "pret";
+  const actions = el("div", { class: "pl-actions" },
+    el("button", { type: "button", class: "pl-bouton" + (P.onglet === "importer" ? " actif" : ""), disabled: !pret, onclick: () => aller("importer") }, ICONE(I.plus), "Importer"),
+    el("button", { type: "button", class: "pl-bouton discret" + (P.onglet === "reglages" ? " actif" : ""), disabled: !pret, onclick: () => aller("reglages") }, "Réglages"));
+  const tete = el("div", { class: "pl-tete" }, barre, actions, el("button", { type: "button", class: "pl-statut", id: "pl-statut" }));
   let corps;
   switch (P.phase) {
     case "chargement": corps = el("div", { class: "vide" }, "Ouverture du coffre…"); break;
@@ -143,12 +145,12 @@ function dessinerStatut() {
   if (!z || !P.coffre) return;
   const st = P.coffre.statut, n = P.coffre.attente.length;
   let texte, classe = "";
-  if (P.coffre.local) { texte = DEMO ? "DÉMO · RIEN N'EST GARDÉ" : "COFFRE LOCAL · CET APPAREIL"; classe = "ambre"; }
-  else if (st.etat === "synchro") texte = "SYNCHRONISATION…";
-  else if (st.etat === "hors-ligne") { texte = "HORS LIGNE" + (n ? " · " + n + " EN ATTENTE" : ""); classe = "ambre"; }
-  else if (st.etat === "erreur") { texte = "SYNCHRO EN ÉCHEC"; classe = "rouge"; }
-  else if (st.etat === "conflit-initial") { texte = "CHOIX À FAIRE"; classe = "ambre"; }
-  else texte = n ? n + " EN ATTENTE" : "COFFRE SYNCHRONISÉ" + (st.derniere ? " · " + quand(st.derniere) : "");
+  if (P.coffre.local) { texte = DEMO ? "Démo, rien n'est gardé" : "Sur cet appareil seulement"; classe = "ambre"; }
+  else if (st.etat === "synchro") texte = "Synchronisation…";
+  else if (st.etat === "hors-ligne") { texte = "Hors ligne" + (n ? " · " + n + " en attente" : ""); classe = "ambre"; }
+  else if (st.etat === "erreur") { texte = "Synchro en échec"; classe = "rouge"; }
+  else if (st.etat === "conflit-initial") { texte = "Choix à faire"; classe = "ambre"; }
+  else texte = n ? n + " en attente d'envoi" : "Synchronisé";
   z.className = "pl-statut " + classe;
   z.replaceChildren(el("i"), texte);
   z.title = st.erreur || (P.coffre.local ? "Les données restent chiffrées sur cet appareil. Ajoute le jeton PLOUTOS_TOKEN pour les retrouver partout (guide, étape 9)." : "Coffre chiffré dans ton dépôt GitHub privé.");
@@ -169,7 +171,7 @@ function vueCle() {
     champ.value = ""; P.ouverture = null; P.phase = "chargement"; dessiner();
     try { await demarrer(cle); } catch (e) { P.phase = "erreur"; P.erreur = e.message; dessiner(); }
   } }, champ, el("button", { class: "cmd", type: "submit" }, "Ouvrir le coffre"), msg);
-  return el("div", { class: "grille" }, el("div", { class: "s6" }, panneau("Coffre PLOUTOS", el("span", { class: "meta" }, "UNE FOIS PAR APPAREIL"), "",
+  return el("div", { class: "grille" }, el("div", { class: "s6" }, panneau("Coffre PLOUTOS", el("span", { class: "meta" }, "une fois par appareil"), "",
     el("p", null, "Tes données financières sont chiffrées avec ta phrase secrète NEXUS. Retape-la une seule fois sur cet appareil pour créer la clé du coffre."),
     form)));
 }
@@ -239,62 +241,77 @@ function barreFiltres({ recherche = false, auChangement }) {
 
 /* ---------------------------------------------------------------- Vue d'ensemble */
 function tuileSolde(nom, s, compteId) {
-  let badge;
-  if (!s) badge = el("span", { class: "pl-badge" }, "AUCUNE DONNÉE");
-  else if (s.inconnu) badge = el("button", { type: "button", class: "pl-badge ambre", onclick: () => saisirSolde(compteId) }, "SOLDE À SAISIR");
-  else if (s.verifie && !s.ancien) badge = el("span", { class: "pl-badge vert", title: "Lu dans un relevé ou saisi le " + dateLongue(s.date) }, "VÉRIFIÉ " + dateCourte(s.date).toUpperCase());
-  else badge = el("span", { class: "pl-badge ambre", title: `Dernier solde vérifié le ${dateLongue(s.date)}, plus ${s.mouvementsDepuis} opération(s) importée(s) depuis.` },
-    (s.verifie ? "RELEVÉ DU " + dateCourte(s.date).toUpperCase() : "ESTIMÉ") + (s.age > 7 ? " · " + s.age + " J" : ""));
+  let etat;
+  if (!s) etat = el("span", { class: "pl-etat" }, "Aucun relevé importé");
+  else if (s.inconnu) etat = el("button", { type: "button", class: "pl-etat ambre lien", onclick: () => saisirSolde(compteId) }, "Solde à saisir");
+  else if (s.verifie && s.age <= 3) etat = el("span", { class: "pl-etat vert", title: "Lu dans un relevé ou saisi le " + dateLongue(s.date) }, "✓ à jour le " + dateCourte(s.date));
+  else etat = el("button", { type: "button", class: "pl-etat ambre lien", onclick: () => saisirSolde(compteId),
+    title: `Dernier solde connu le ${dateLongue(s.date)}${s.mouvementsDepuis ? `, plus ${s.mouvementsDepuis} opération(s) importée(s) depuis` : ""}. Touche pour saisir le solde affiché par ta banque.` },
+    (s.verifie ? "Au " + dateCourte(s.date) : "Estimé") + " · mettre à jour");
   return el("div", { class: "pl-tuile" }, el("div", { class: "pl-tuile-nom" }, nom),
-    el("div", { class: "pl-tuile-val" + (s && s.montant < 0 ? " negatif" : "") }, s && s.montant != null ? euros(s.montant) : "—"), badge);
+    el("div", { class: "pl-tuile-val" + (s && s.montant < 0 ? " negatif" : "") }, s && s.montant != null ? euros(s.montant) : "—"), etat);
 }
 function vueApercu() {
   const etat = E(), ops = Object.values(etat.operations);
   if (!ops.length) return accueilVide();
   const auj = aujourdhui();
-  const soldes = etat.config.comptes.map((c) => ({ c, s: M.solde(etat, c.id, auj) }));
-  const total = soldes.reduce((t, x) => t + (x.s && x.s.montant != null ? x.s.montant : 0), 0);
-  const tousVerifies = soldes.every((x) => !x.s || (x.s.verifie && !x.s.ancien));
+  const f = P.filtres;
   const periode = opsFiltrees({ recherche: false });
   const t = M.totaux(etat, periode);
-  const libPeriode = PERIODES.find(([v]) => v === P.filtres.periode)[1].toLowerCase();
+  const nomPeriode = f.periode === "mois" ? MOIS_NOMS[Number(auj.slice(5, 7)) - 1]
+    : f.periode === "mois-1" ? MOIS_NOMS[(Number(auj.slice(5, 7)) + 10) % 12] : (PERIODES.find(([v]) => v === f.periode) || [, "la période"])[1].toLowerCase();
+  const bilan = t.revenus - t.depenses;
 
-  const kpi = (nom, val, sous, classe) => el("div", { class: "pl-kpi " + (classe || "") }, el("div", { class: "pl-tuile-nom" }, nom), el("div", { class: "pl-kpi-val" }, val), sous ? el("div", { class: "secondaire" }, sous) : null);
-  const aValider = ops.filter((o) => o.aValider).sort((a, b) => b.date.localeCompare(a.date));
+  // Tuiles : un compte par tuile, puis le bilan de la période
+  const tuiles = etat.config.comptes.map((c) => tuileSolde(c.nom.replace(/ compte courant$/i, ""), M.solde(etat, c.id, auj), c.id));
+  tuiles.push(el("div", { class: "pl-tuile bilan" + (bilan < 0 ? " negatif" : "") },
+    el("div", { class: "pl-tuile-nom" }, bilan >= 0 ? "Il te reste" : "Tu as dépensé de plus"),
+    el("div", { class: "pl-tuile-val" }, euros(Math.abs(bilan))),
+    el("span", { class: "pl-etat" }, `revenus ${euros(t.revenus, { rond: true })} − dépenses ${euros(t.depenses, { rond: true })}`)));
 
   // Dépenses par groupe
   const groupes = Object.entries(t.parGroupe).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
   const max = groupes.length ? groupes[0][1] : 1;
   const barres = groupes.length ? el("div", { class: "pl-barres" }, groupes.map(([gid, v]) => {
     const g = M.groupe(etat, gid);
-    return el("button", { type: "button", class: "pl-barre-ligne", onclick: () => aller("operations", { cible: gid === "_aucun" ? "_aucune" : "g:" + gid }) },
-      el("span", { class: "pl-barre-nom" }, g ? g.nom : "Non classées"),
+    return el("button", { type: "button", class: "pl-barre-ligne", title: "Voir les opérations", onclick: () => aller("operations", { cible: gid === "_aucun" ? "_aucune" : "g:" + gid }) },
+      el("span", { class: "pl-barre-nom" }, g ? g.nom : "Pas encore classées"),
       el("span", { class: "pl-barre-piste" }, el("i", { style: `width:${(v / max * 100).toFixed(1)}%;background:${g ? g.couleur : "var(--tres-doux)"}` })),
       el("span", { class: "pl-barre-val" }, euros(v, { rond: true })));
   })) : el("div", { class: "vide" }, "Aucune dépense sur la période.");
 
-  const j = joursEntre(donnees.ploutos.point_budget_date);
+  // À vérifier : confirmer en un clic
+  const aVerifier = ops.filter((o) => o.aValider).sort((a, b) => b.date.localeCompare(a.date));
+  const ligneVerif = (o) => {
+    const c = o.categorie && M.categorie(etat, o.categorie);
+    return el("div", { class: "pl-verif" },
+      el("button", { type: "button", class: "pl-verif-nom", onclick: () => detailOperation(o.id) }, el("b", null, o.commercant),
+        el("span", { class: "secondaire" }, c ? c.nom + " ?" : "Catégorie inconnue")),
+      el("span", { class: "pl-op-montant" + (o.montant > 0 ? " positif" : "") }, euros(o.montant, { signe: true })),
+      c ? el("button", { type: "button", class: "pl-mini-bouton oui", title: "Oui, c'est bien " + c.nom, onclick: async () => { await faire({ type: "valider", ids: [o.id] }); } }, "Oui") : null,
+      el("button", { type: "button", class: "pl-mini-bouton", onclick: (e) => choisirCategorie(e.currentTarget, [o.id]) }, c ? "Changer" : "Classer"));
+  };
+
+  const choixPeriode = el("select", { class: "pl-periode", "aria-label": "Période", onchange: (e) => { f.periode = e.target.value; memo.ecrire("filtres", { ...f, q: "", aValider: false }); dessiner(); } },
+    PERIODES.filter(([v]) => v !== "perso").map(([v, n]) => el("option", { value: v, selected: f.periode === v }, n)));
+
   return el("div", { class: "pl-pile" },
-    barreFiltres({ auChangement: dessiner }),
+    el("div", { class: "pl-tuiles accueil" }, tuiles),
     el("div", { class: "grille" },
-      el("div", { class: "s12" }, panneau("Soldes", el("span", { class: "meta" }, tousVerifies ? "VÉRIFIÉS" : "CERTAINS ESTIMÉS"), "",
-        el("div", { class: "pl-tuiles" }, soldes.map(({ c, s: sd }) => tuileSolde(c.nom, sd, c.id)),
-          el("div", { class: "pl-tuile total" }, el("div", { class: "pl-tuile-nom" }, "Patrimoine financier connu"), el("div", { class: "pl-tuile-val" }, euros(total)),
-            el("span", { class: "pl-badge" + (tousVerifies ? " vert" : " ambre") }, tousVerifies ? "VÉRIFIÉ" : "EN PARTIE ESTIMÉ"))))),
-      el("div", { class: "s12" }, el("div", { class: "pl-kpis" },
-        kpi("Salaire reçu", euros(t.salaire), libPeriode),
-        kpi("Dépenses", euros(t.depenses), t.nonClassees ? t.nonClassees + " non classée(s)" : libPeriode, "rouge"),
-        kpi("Épargne nette", euros(t.epargne, { signe: true }), "versements − retraits + intérêts", t.epargne >= 0 ? "vert" : "rouge"),
-        kpi("Revenus − dépenses", euros(t.revenus - t.depenses, { signe: true }), "revenus : " + euros(t.revenus), t.revenus - t.depenses >= 0 ? "vert" : "rouge"))),
-      el("div", { class: "s7" }, panneau("Dépenses par groupe", el("span", { class: "meta" }, libPeriode.toUpperCase()), "", barres)),
-      el("div", { class: "s5 pile" },
-        panneau("À valider", el("span", { class: "compte" }, String(aValider.length)), "",
-          aValider.length ? el("div", null, el("ul", { class: "liste" }, aValider.slice(0, 6).map((o) => el("li", null, ligneCompacte(o)))),
-            el("button", { type: "button", class: "pl-lien", onclick: () => aller("operations", { periode: "tout", cible: "" }) || (P.filtres.aValider = true, dessiner()) }, "Tout voir →"))
-            : el("div", { class: "vide" }, "Tout est classé.")),
-        panneau("Point budget", el("span", { class: "meta" }, donnees.ploutos.point_budget.toUpperCase()), "",
-          el("div", { class: "jauges", style: "grid-template-columns:1fr" }, jauge({ valeur: 31 - Math.min(j, 31), max: 31, texte: j ? "J-" + j : "AUJ.", lib: j ? "avant le point du mois" : "c'est aujourd'hui", unite: "LE 5 DU MOIS" })))),
-      el("div", { class: "s12" }, panneau("12 derniers mois", el("span", { class: "meta" }, "DÉPENSES ET REVENUS"), "", graphiqueMois(M.parMois(etat, ops, 12, aujourdhui()))))));
+      el("div", { class: "s7" }, el("section", { class: "panneau pl-carte" },
+        el("div", { class: "pl-carte-tete" }, el("h2", null, "Dépenses " + (/^[aeiouéèâ]/i.test(nomPeriode) ? "d'" : "de ") + nomPeriode), choixPeriode),
+        el("p", { class: "pl-carte-sous" }, el("b", null, euros(t.depenses)), ` dépensés · ${euros(t.revenus)} reçus` + (t.salaire ? ` dont ${euros(t.salaire)} de salaire` : "")),
+        barres)),
+      el("div", { class: "s5" }, el("section", { class: "panneau pl-carte" + (aVerifier.length ? " attention" : "") },
+        el("div", { class: "pl-carte-tete" }, el("h2", null, "À vérifier", aVerifier.length ? el("span", { class: "pl-compte" }, String(aVerifier.length)) : null)),
+        aVerifier.length ? [
+          el("p", { class: "pl-carte-sous" }, "PLOUTOS n'est pas sûr de ces opérations. Confirme ou change la catégorie : il retient ta réponse."),
+          el("div", { class: "pl-verifs" }, aVerifier.slice(0, 6).map(ligneVerif)),
+          aVerifier.length > 6 ? el("button", { type: "button", class: "pl-lien", onclick: () => { aller("operations", { periode: "tout", cible: "", compte: "" }); P.filtres.aValider = true; dessiner(); } }, `Voir les ${aVerifier.length}`) : null,
+        ] : el("p", { class: "pl-carte-sous" }, "✓ Tout est classé."))),
+      el("div", { class: "s12" }, el("section", { class: "panneau pl-carte" },
+        el("div", { class: "pl-carte-tete" }, el("h2", null, "Les 12 derniers mois")),
+        graphiqueMois(M.parMois(etat, ops, 12, auj))))));
 }
 function accueilVide() {
   return el("div", { class: "grille" }, el("div", { class: "s8" }, panneau("Bienvenue dans PLOUTOS", null, "",
@@ -320,7 +337,7 @@ function graphiqueMois(mois) {
     g.append(grp);
   });
   return el("div", null, g, el("div", { class: "pl-legende" }, el("span", null, el("i", { style: "background:var(--ploutos)" }), "Revenus"), el("span", null, el("i", { style: "background:var(--ambre)" }), "Dépenses"),
-    el("span", { class: "secondaire" }, "Hors virements entre tes comptes")));
+    el("span", { class: "secondaire" }, "Sans les virements entre tes comptes")));
 }
 
 /* ---------------------------------------------------------------- Opérations */
@@ -706,7 +723,7 @@ function vueComptes() {
   return el("div", { class: "grille" }, etat.config.banques.map((b) => {
     const comptes = etat.config.comptes.filter((c) => c.banque === b.id);
     const imports = etat.imports.filter((i) => i.banque === b.id).sort((a, x) => x.t.localeCompare(a.t));
-    return el("div", { class: "s6" }, panneau(b.nom, el("span", { class: "meta" }, comptes.length + " COMPTE(S)"), "",
+    return el("div", { class: "s6" }, panneau(b.nom, el("span", { class: "meta" }, comptes.length + (comptes.length > 1 ? " comptes" : " compte")), "",
       el("div", { class: "pl-tuiles" }, comptes.map((c) => {
         const s0 = M.solde(etat, c.id, auj);
         const n = Object.values(etat.operations).filter((o) => o.compte === c.id).length;
@@ -773,7 +790,7 @@ function vueImporter() {
     ondrop: (e) => { e.preventDefault(); e.currentTarget.classList.remove("survol"); recevoirFichiers([...e.dataTransfer.files]); },
     onkeydown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); entree.click(); } } },
     entree, ICONE(I.export), el("b", null, "Dépose tes relevés ici"), el("span", { class: "secondaire" }, "ou touche pour choisir · CSV ou Excel · LCL, Revolut (courant et épargne) · plusieurs fichiers à la fois"));
-  const blocs = [el("div", { class: "s12" }, panneau("Importer des relevés", el("span", { class: "meta" }, "RIEN N'EST ENREGISTRÉ AVANT TA CONFIRMATION"), "", zone))];
+  const blocs = [el("div", { class: "s12" }, panneau("Importer des relevés", el("span", { class: "meta" }, "rien n'est enregistré avant ta confirmation"), "", zone))];
   if (P.importsEnCours) {
     for (const it of P.importsEnCours) blocs.push(el("div", { class: "s6" }, carteImport(it)));
     const prets = P.importsEnCours.filter((i) => i.apercu);
@@ -793,7 +810,7 @@ function carteImport(it) {
   if (!r.reconnu) return formulaireFormat(it);
   const a = it.apercu, etat = E();
   const ign = Object.entries(r.ignorees || {});
-  return panneau(it.fichier.name, el("span", { class: "meta" }, r.nomProfil.toUpperCase()), "",
+  return panneau(it.fichier.name, el("span", { class: "meta" }, r.nomProfil), "",
     el("dl", { class: "pl-dl" },
       el("dt", null, "Comptes"), el("dd", null, a.comptes.map((c) => M.compte(etat, c)?.nom || c).join(", ")),
       el("dt", null, "Période"), el("dd", null, r.periode ? `du ${dateLongue(r.periode.du)} au ${dateLongue(r.periode.au)}` : "—"),
@@ -818,7 +835,7 @@ function formulaireFormat(it) {
   const cDate = sel("Date", 0), cMontant = sel("Montant", 1, true), cDebit = sel("Ou débit", -1, true), cCredit = sel("et crédit", -1, true), cLib = sel("Libellé", 2);
   const compte = el("select", null, E().config.comptes.map((c) => el("option", { value: c.id }, c.nom)));
   const nom = el("input", { type: "text", value: "Format " + it.fichier.name.replace(/\.\w+$/, "") });
-  return panneau(it.fichier.name, el("span", { class: "meta" }, "FORMAT INCONNU"), "",
+  return panneau(it.fichier.name, el("span", { class: "meta" }, "format inconnu"), "",
     el("p", null, "PLOUTOS ne reconnaît pas ce fichier. Indique les colonnes une fois : le format sera retenu pour les prochains imports."),
     el("div", { class: "pl-tableau" }, el("table", null, lignes.map((l) => el("tr", null, cols.map((i) => el("td", null, l[i] ?? "")))))),
     el("div", { class: "pl-form deux" }, el("label", { class: "pl-bascule" }, entete, "La première ligne contient les titres"), cDate, cMontant, cDebit, cCredit, cLib,
@@ -873,7 +890,7 @@ function reglagesCategories() {
   return el("div", { class: "grille" }, groupes.map((g) => {
     const cats = etat.config.categories.filter((c) => c.groupe === g.id && !c.archivee).sort((a, b) => a.ordre - b.ordre);
     return el("div", { class: "s6" }, el("section", { class: "panneau pl-groupe" + (g.masque ? " masque" : ""), style: `--m:${g.couleur}` },
-      el("div", { class: "p-titre" }, el("h2", null, g.nom), el("span", { class: "meta" }, TYPES[g.type].toUpperCase() + (g.masque ? " · MASQUÉ" : ""))),
+      el("div", { class: "p-titre" }, el("h2", null, g.nom), el("span", { class: "meta" }, TYPES[g.type] + (g.masque ? " · masqué" : ""))),
       el("ul", { class: "liste" }, cats.map((c) => el("li", null, el("div", { class: "pl-cat-ligne" + (c.masquee ? " masquee" : "") },
         el("span", null, c.nom, c.masquee ? el("small", null, " (masquée)") : null),
         el("span", { class: "secondaire" }, (usage[c.id] || 0) + " op."),
@@ -926,7 +943,7 @@ function reglagesRegles() {
         el("button", { type: "button", class: "cmd", onclick: () => editeurRegle({ id: "regle_" + uid(), conditions: [{ champ: "commercant", op: "contient", valeur: "" }], action: { categorie: null }, priorite: 50, active: true, origine: "manuelle" }, { nouvelle: true }) }, ICONE(I.plus), "Nouvelle règle"),
         el("button", { type: "button", class: "cmd", onclick: () => confirmer("Repasser toutes les règles", "Les opérations classées par une règle ou non classées sont reclassées avec les règles actuelles. Tes corrections manuelles et les virements internes ne bougent pas.", "Reclasser",
           async () => { const r = await faire({ type: "reclasser" }); avis(r.ids.length + " opération(s) reclassée(s)"); }, false) }, "Repasser les règles sur tout")))),
-    el("div", { class: "s12" }, panneau("Règles de base", el("span", { class: "meta" }, (M.BASES.length - inactives.size) + " ACTIVES SUR " + M.BASES.length), "",
+    el("div", { class: "s12" }, panneau("Règles de base", el("span", { class: "meta" }, (M.BASES.length - inactives.size) + " actives sur " + M.BASES.length), "",
       el("p", { class: "secondaire" }, "Enseignes nationales courantes. Décoche celles qui ne te conviennent pas."), filtreBase, listeBase)));
 }
 function telecharger(nom, contenu, type) {
@@ -946,7 +963,7 @@ function reglagesDonnees() {
   } });
   const journal = [...etat.journal].reverse().slice(0, 150);
   return el("div", { class: "grille" },
-    el("div", { class: "s6" }, panneau("Coffre", el("span", { class: "meta" }, c.local ? "LOCAL" : "SYNCHRONISÉ"), "",
+    el("div", { class: "s6" }, panneau("Coffre", el("span", { class: "meta" }, c.local ? "sur cet appareil" : "synchronisé"), "",
       el("dl", { class: "pl-dl" },
         el("dt", null, "Stockage"), el("dd", null, c.local ? "Chiffré sur cet appareil seulement" : "Chiffré dans ton dépôt GitHub privé " + donnees.ploutos.coffre.depot),
         el("dt", null, "Cet appareil"), el("dd", null, nomAppareil()),

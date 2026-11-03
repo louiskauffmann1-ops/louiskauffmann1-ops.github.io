@@ -20,29 +20,82 @@
 .cmd.pl-danger:hover { border-color: var(--alerte); color: var(--alerte); }
 label.cmd input[type="file"] { display: none; }
 
-/* Onglets du module */
-.pl-tete { display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--ligne); margin-top: -8px; min-width: 0; }
-.pl-onglets { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+/* En-tête du module : 3 onglets, 2 boutons, l'état du coffre. Phrases simples, pas de majuscules partout. */
+.pl-tete { display: flex; align-items: center; gap: 16px; border-bottom: 1px solid var(--ligne); margin-top: -8px; min-width: 0; flex-wrap: wrap; }
+.pl-onglets { flex: 0 1 auto; min-width: 0; display: flex; align-items: center; gap: 4px; overflow-x: auto; scrollbar-width: none; }
 .pl-onglets::-webkit-scrollbar { display: none; }
 .pl-onglet {
-  position: relative; flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 10px 12px; cursor: pointer;
-  background: none; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px;
-  font: 600 11px/1 var(--titre); letter-spacing: .14em; color: var(--doux); text-transform: uppercase;
+  position: relative; flex: none; display: inline-flex; align-items: center; gap: 8px; padding: 12px 16px 13px; cursor: pointer;
+  background: none; border: 0; border-bottom: 3px solid transparent; margin-bottom: -1px;
+  font: 600 16px/1 var(--corps); color: var(--doux);
 }
 .pl-onglet:hover:not(:disabled) { color: var(--texte); }
-.pl-onglet[aria-current="page"] { color: var(--ploutos); border-bottom-color: var(--ploutos); text-shadow: 0 0 12px color-mix(in srgb, var(--ploutos) 50%, transparent); }
+.pl-onglet[aria-current="page"] { color: var(--texte); border-bottom-color: var(--ploutos); box-shadow: 0 8px 14px -12px var(--ploutos); }
 .pl-onglet:disabled { cursor: default; opacity: .4; }
-.pl-onglet small { font: 500 8px/1 var(--mono); letter-spacing: .1em; padding: 2px 4px; border: 1px solid var(--ligne-forte); }
-.pl-pastille { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--ambre); color: var(--fond); font: 700 10px/18px var(--mono); text-align: center; letter-spacing: 0; }
-.pl-statut {
-  flex: none; background: none; color: var(--doux); display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; cursor: pointer;
-  border: 1px solid var(--ligne); font: 500 10px/1.2 var(--mono); letter-spacing: .08em; color: var(--doux); white-space: nowrap;
+.pl-pastille { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; background: var(--ambre); color: var(--fond); font: 700 11px/20px var(--mono); text-align: center; }
+.pl-actions { display: flex; gap: 8px; margin-left: auto; padding: 6px 0; }
+.pl-bouton {
+  display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; cursor: pointer; border-radius: 8px;
+  border: 1px solid var(--ploutos); background: color-mix(in srgb, var(--ploutos) 8%, transparent); color: var(--ploutos); font: 600 14px/1 var(--corps);
 }
-.pl-statut i { width: 6px; height: 6px; border-radius: 50%; background: var(--ploutos); box-shadow: 0 0 6px var(--ploutos); }
+.pl-bouton svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; }
+.pl-bouton:hover, .pl-bouton.actif { background: var(--ploutos); color: var(--fond); }
+.pl-bouton.discret { border-color: var(--ligne-forte); background: none; color: var(--doux); }
+.pl-bouton.discret:hover, .pl-bouton.discret.actif { border-color: var(--texte); background: none; color: var(--texte); }
+.pl-bouton:disabled { opacity: .4; cursor: default; }
+.pl-statut {
+  flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 4px 0; cursor: pointer; background: none; border: 0;
+  font: 500 12px/1.2 var(--corps); color: var(--doux); white-space: nowrap;
+}
+.pl-statut:hover { color: var(--texte); }
+.pl-statut i { width: 7px; height: 7px; border-radius: 50%; background: var(--ploutos); box-shadow: 0 0 6px var(--ploutos); }
 .pl-statut.ambre i { background: var(--ambre); box-shadow: 0 0 6px var(--ambre); }
-.pl-statut.rouge { color: #ffb3bb; border-color: rgba(255, 77, 94, .5); }
+.pl-statut.rouge { color: #ffb3bb; }
 .pl-statut.rouge i { background: var(--alerte); box-shadow: 0 0 6px var(--alerte); }
 .pl-statut:empty { display: none; }
+
+/* Dans PLOUTOS, les titres se lisent comme des phrases (l'allure NEXUS reste : panneaux, liserés, lueurs). */
+.pl .p-titre h2, .pl-voile .p-titre h2 { font: 700 18px/1.25 var(--corps); letter-spacing: 0; text-transform: none; color: var(--texte); }
+.pl .p-titre .meta { font: 500 13px/1.2 var(--corps); letter-spacing: 0; text-transform: none; }
+.pl .pl-tuile-nom, .pl .pl-sous-titre, .pl-dl dt { font-family: var(--corps); font-size: 13px; letter-spacing: 0; text-transform: none; font-weight: 500; }
+.pl .filtre { font: 600 14px/1 var(--corps); letter-spacing: 0; }
+
+/* Accueil */
+.pl-tuiles.accueil { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
+.pl-tuiles.accueil .pl-tuile { padding: 18px 20px; border-radius: 12px; border-color: var(--ligne-forte); background: linear-gradient(160deg, rgba(14, 30, 46, .6), rgba(6, 13, 21, .8)); }
+.pl-tuiles.accueil .pl-tuile-nom { font: 500 14px/1.2 var(--corps); letter-spacing: 0; text-transform: none; color: var(--doux); }
+.pl-tuiles.accueil .pl-tuile-val { font: 700 30px/1.1 var(--titre); letter-spacing: .01em; }
+.pl-tuile.bilan { border-color: var(--ploutos) !important; box-shadow: 0 0 22px -10px var(--ploutos), inset 0 0 0 1px color-mix(in srgb, var(--ploutos) 25%, transparent); }
+.pl-tuile.bilan .pl-tuile-val { color: var(--ploutos); text-shadow: 0 0 18px color-mix(in srgb, var(--ploutos) 45%, transparent); }
+.pl-tuile.bilan.negatif { border-color: var(--ambre) !important; box-shadow: 0 0 22px -10px var(--ambre); }
+.pl-tuile.bilan.negatif .pl-tuile-val { color: var(--ambre); text-shadow: none; }
+.pl-etat { justify-self: start; padding: 0; background: none; border: 0; font: 500 13px/1.3 var(--corps); color: var(--doux); text-align: left; }
+.pl-etat.vert { color: var(--ploutos); }
+.pl-etat.ambre { color: var(--ambre); }
+.pl-etat.lien { cursor: pointer; text-decoration: underline; text-decoration-color: color-mix(in srgb, currentColor 40%, transparent); text-underline-offset: 3px; }
+.pl-carte { display: grid; gap: 14px; align-content: start; }
+.pl-carte.attention { --m: var(--ambre); }
+.pl-carte-tete { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; }
+.pl-carte-tete h2 { margin: 0; display: flex; align-items: center; gap: 10px; font: 700 19px/1.2 var(--corps); color: var(--texte); }
+.pl-carte-tete .pl-periode { margin-left: auto; }
+.pl-compte { min-width: 24px; height: 24px; padding: 0 7px; border-radius: 12px; background: var(--ambre); color: var(--fond); font: 700 13px/24px var(--mono); text-align: center; }
+.pl-carte-sous { margin: -4px 0 0; color: var(--doux); font-size: 14px; }
+.pl-carte-sous b { color: var(--texte); font-size: 16px; }
+.pl-carte .pl-barre-ligne { grid-template-columns: minmax(0, 200px) minmax(0, 1fr) auto; padding: 8px 4px; }
+.pl-carte .pl-barre-nom { font-size: 15px; }
+.pl-carte .pl-barre-piste { height: 10px; border-radius: 99px; overflow: hidden; }
+.pl-carte .pl-barre-val { font: 600 14px/1 var(--corps); min-width: 64px; }
+.pl-verifs { display: grid; }
+.pl-verif { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; gap: 10px; align-items: center; padding: 10px 0; border-top: 1px solid var(--ligne); }
+.pl-verif-nom { min-width: 0; display: grid; gap: 2px; padding: 0; background: none; border: 0; color: var(--texte); text-align: left; cursor: pointer; }
+.pl-verif-nom b { font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pl-verif-nom .secondaire { margin: 0; }
+.pl-verif-nom:hover b { color: var(--ploutos); }
+.pl-verif .pl-op-montant { font-size: 14px; }
+.pl-mini-bouton { min-height: 34px; padding: 6px 12px; border-radius: 6px; cursor: pointer; border: 1px solid var(--ligne-forte); background: none; color: var(--texte); font: 600 13px/1 var(--corps); }
+.pl-mini-bouton:hover { border-color: var(--texte); }
+.pl-mini-bouton.oui { border-color: var(--ploutos); color: var(--ploutos); }
+.pl-mini-bouton.oui:hover { background: var(--ploutos); color: var(--fond); }
 
 /* Clé du coffre */
 .pl-cle { display: grid; gap: 10px; max-width: 360px; margin-top: 10px; }
@@ -278,8 +331,20 @@ button.pl-cat:hover { border-color: var(--ploutos); }
   .pl-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 760px) {
-  .pl-tete { flex-direction: column; align-items: stretch; gap: 8px; margin-top: 0; }
-  .pl-statut { order: -1; align-self: flex-start; }
+  .pl-tete { margin-top: 0; gap: 4px 8px; }
+  .pl-statut { order: -1; width: 100%; }
+  .pl-onglets { order: 1; width: 100%; }
+  .pl-actions { order: 0; margin-left: 0; padding: 0; }
+  .pl-onglet { padding: 12px 12px 13px; font-size: 15px; }
+  .pl-tuiles.accueil { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .pl-tuiles.accueil .pl-tuile { padding: 14px; }
+  .pl-tuiles.accueil .pl-tuile-val { font-size: 22px; }
+  .pl-tuile.bilan { grid-column: 1 / -1; }
+  .pl-carte .pl-barre-ligne { grid-template-columns: minmax(0, 1fr) auto; }
+  .pl-verif { grid-template-columns: minmax(0, 1fr) auto; }
+  .pl-verif .pl-mini-bouton { grid-row: 2; }
+  .pl-verif .pl-mini-bouton.oui { grid-column: 1; justify-self: end; }
+  .pl-verif .pl-mini-bouton:last-child { grid-column: 2; }
   .pl-filtres > * { flex: 1 1 140px; }
   .pl-filtres > .pl-lien, .pl-filtres > .pl-bascule { flex: 0 1 auto; }
   .pl-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
