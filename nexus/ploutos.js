@@ -59,7 +59,7 @@ async function ouvrir() {
   if (P.ouverture) return P.ouverture;
   P.ouverture = (async () => {
     try {
-      const cle = DEMO ? await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]) : await lireCle(CLE_COFFRE);
+      const cle = DEMO ? await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]) : ((await cleCoffreEnCours) || await lireCle(CLE_COFFRE));
       if (!cle) { P.phase = "cle"; return dessiner(); }
       await demarrer(cle);
     } catch (e) { console.error(e); P.phase = "erreur"; P.erreur = e.message; dessiner(); }
@@ -86,6 +86,7 @@ async function demarrer(cle, ancienne) {
   });
   dessiner();
   if (distant) P.coffre.synchroniser();
+  if (iaDispo() && aClasserIA().length) setTimeout(() => classerIA({ silencieux: true }), 2500);
   addEventListener("online", () => P.coffre && P.coffre.synchroniser());
 }
 async function faire(action, { redessiner = true } = {}) {
@@ -425,6 +426,10 @@ function majBarreOps() {
     enfants.push(el("span", null, el("b", null, String(ops.length)), " opération(s)"),
       el("span", null, "dépenses ", el("b", null, euros(t.depenses))), el("span", null, "revenus ", el("b", { class: "positif" }, euros(t.revenus))),
       ops.length ? el("button", { type: "button", class: "pl-lien", onclick: () => telecharger("ploutos-operations.csv", M.exporterCsv(E(), ops), "text/csv") }, "Exporter en CSV") : null);
+    const n = aClasserIA().length;
+    if (P.iaEnCours) enfants.push(el("span", { class: "pl-badge vert" }, "CLASSEMENT AUTOMATIQUE EN COURS…"));
+    else if (n && iaDispo()) enfants.push(el("button", { type: "button", class: "cmd pl-principal", onclick: () => classerIA() }, `Classer automatiquement (${n})`));
+    else if (n && !DEMO) enfants.push(el("span", { class: "secondaire", title: "Ajoute la clé Claude (guide, étape 7) : PLOUTOS classera seul les commerçants inconnus." }, `${n} sans règle · classement automatique : clé Claude à ajouter`));
   }
   P.barreOps.replaceChildren(...enfants);
 }
@@ -543,16 +548,20 @@ function proposerRegleApres(op, cat) {
   const deja = etat.config.regles.some((r) => r.action.categorie === cat && M.regleCorrespond(op, r));
   if (deja || !op.commercant) return;
   fermerSuggestion();
+  // PLOUTOS apprend tout seul : la correction devient une règle, appliquée aux opérations semblables (sauf corrections manuelles).
   const regle = M.proposerRegle(op, cat);
-  const cibles = M.operationsCibles(etat, regle).filter((o) => o.categorie !== cat).length;
-  P.suggestion = el("div", { class: "pl-suggestion", role: "status" },
-    el("span", null, "Toujours classer ", el("b", null, "« " + op.commercant + " »"), " en ", el("b", null, c.nom), " ?",
-      cibles ? el("span", { class: "secondaire" }, ` ${cibles} autre(s) opération(s) déjà importée(s) correspondent.`) : null),
-    el("button", { type: "button", class: "cmd pl-principal", onclick: () => { fermerSuggestion(); editeurRegle(regle, { nouvelle: true }); } }, "Créer la règle"),
-    el("button", { type: "button", class: "pl-lien", onclick: fermerSuggestion }, "Non merci"));
-  document.body.append(P.suggestion);
-  clearTimeout(P.suggestionMinuteur);
-  P.suggestionMinuteur = setTimeout(fermerSuggestion, 15000);
+  faire({ type: "regle", regle, appliquer: true }, { redessiner: false }).then((res) => {
+    rafraichirVue();
+    const autres = res.ids.filter((id) => id !== op.id).length;
+    P.suggestion = el("div", { class: "pl-suggestion", role: "status" },
+      el("span", null, "Retenu : ", el("b", null, "« " + op.commercant + " »"), " → ", el("b", null, c.nom), ".",
+        el("span", { class: "secondaire" }, autres ? ` ${autres} autre(s) opération(s) classée(s) pareil, et les prochaines aussi.` : " Les prochaines seront classées pareil.")),
+      el("button", { type: "button", class: "pl-lien", onclick: () => { fermerSuggestion(); editeurRegle(E().config.regles.find((r) => r.id === regle.id) || regle); } }, "Modifier"),
+      el("button", { type: "button", class: "pl-lien danger", onclick: async () => { fermerSuggestion(); await faire({ type: "supprimer-regle", idRegle: regle.id }, { redessiner: false }); await faire({ type: "reclasser" }, { redessiner: false }); rafraichirVue(); avis("Règle annulée."); } }, "Annuler"));
+    document.body.append(P.suggestion);
+    clearTimeout(P.suggestionMinuteur);
+    P.suggestionMinuteur = setTimeout(fermerSuggestion, 12000);
+  });
 }
 function fermerSuggestion() { if (P.suggestion) { P.suggestion.remove(); P.suggestion = null; } }
 
@@ -837,6 +846,7 @@ async function enregistrerImports() {
   }
   P.importsEnCours = null;
   avis(`${ajoutees} opération(s) ajoutée(s)` + (aValider ? `, ${aValider} à vérifier` : ""));
+  if (aValider && iaDispo()) setTimeout(() => classerIA(), 1500);
   if (aValider) { aller("operations", { periode: "tout", cible: "", compte: "" }); P.filtres.aValider = true; dessiner(); }
   else aller("apercu");
 }
@@ -960,6 +970,63 @@ function reglagesDonnees() {
     el("div", { class: "s12" }, panneau("Journal des modifications", el("span", { class: "compte" }, String(etat.journal.length)), "",
       journal.length ? el("ul", { class: "liste" }, journal.map((j) => el("li", null, el("div", { class: "pl-mini" }, el("span", null, quand(j.t)), el("span", null, j.resume), el("span", { class: "secondaire" }, j.appareil || "")))))
         : el("div", { class: "vide" }, "Rien pour l'instant."))));
+}
+
+/* ---------------------------------------------------------------- Classement automatique par l'IA
+   Les règles passent d'abord (gratuites). Seules les opérations qu'aucune règle ne reconnaît partent à Claude (Haiku),
+   avec le libellé, le montant et le type, jamais les soldes ni les comptes. Chaque réponse sûre devient une règle :
+   le même commerçant ne repart jamais à l'IA. Coût : une fraction de centime par import. */
+const iaDispo = () => !DEMO && !!(donnees && donnees.jarvis && donnees.jarvis.cle);
+const aClasserIA = () => Object.values(E().operations).filter((o) => !o.categorie && !o.lien && o.source !== "manuel");
+async function classerIA({ silencieux = false } = {}) {
+  if (!iaDispo() || P.iaEnCours) return null;
+  const etat = E(), ops = aClasserIA().slice(0, 150);
+  if (!ops.length) return null;
+  P.iaEnCours = true; majBarreOps();
+  try {
+    const groupes = [...etat.config.groupes].filter((g) => !g.archive).sort((a, b) => a.ordre - b.ordre);
+    const cats = groupes.flatMap((g) => etat.config.categories.filter((c) => c.groupe === g.id && !c.archivee).map((c) => `${c.id} = ${g.nom} › ${c.nom}`));
+    const lignes = ops.map((o, i) => `${i}\t${o.montant < 0 ? "dépense" : "rentrée"} ${(Math.abs(o.montant) / 100).toFixed(2)} €\t${o.type || ""}\t${o.commercant}\t${o.libelle}`);
+    const consigne = [
+      "Tu classes des opérations bancaires françaises (comptes d'un particulier, en France) dans des catégories de budget.",
+      "Catégories autorisées (identifiant = groupe › catégorie) :", ...cats, "",
+      "Pour chaque opération, réponds par un objet {\"i\": numéro, \"c\": identifiant de catégorie, \"s\": true si tu es sûr, false sinon}.",
+      "Sûr = tu connais l'enseigne ou le libellé ne laisse aucun doute. Une personne physique (prénom nom) : divers-paiements-entre-amis, s false.",
+      "Si tu ne sais vraiment pas, utilise divers-depenses-non-classees avec s false. Une rentrée d'argent n'est jamais une dépense.",
+      "Réponds uniquement par le tableau JSON, sans texte autour.",
+    ].join("\n");
+    const r = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-api-key": donnees.jarvis.cle, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+      body: JSON.stringify({ model: donnees.jarvis.modele || "claude-haiku-5-5", max_tokens: 6000, thinking: { type: "disabled" }, output_config: { effort: "low" },
+        system: consigne, messages: [{ role: "user", content: "Opérations (numéro, sens et montant, type, commerçant, libellé) :\n" + lignes.join("\n") }] }),
+    });
+    if (!r.ok) throw new Error("Claude a répondu " + r.status);
+    const texte = (await r.json()).content.filter((b) => b.type === "text").map((b) => b.text).join("");
+    const json = JSON.parse(texte.slice(texte.indexOf("["), texte.lastIndexOf("]") + 1));
+    const resultats = [], regles = [], vus = new Set();
+    for (const x of Array.isArray(json) ? json : []) {
+      const o = ops[Number(x.i)];
+      if (!o || !M.categorie(etat, x.c)) continue;
+      const sur = x.s === true && x.c !== "divers-depenses-non-classees";
+      resultats.push({ id: o.id, categorie: x.c, sur });
+      if (sur && o.commercant) {
+        const regle = { ...M.proposerRegle(o, x.c), origine: "ia", priorite: 60 };
+        regle.id = "ia_" + uid() + regles.length;
+        const cle = regle.conditions[0].valeur + "|" + regle.conditions[1].valeur;
+        if (!vus.has(cle) && !etat.config.regles.some((y) => M.regleCorrespond(o, y))) { vus.add(cle); regles.push(regle); }
+      }
+    }
+    const res = await faire({ type: "classer-ia", resultats, regles }, { redessiner: false });
+    rafraichirVue();
+    const doutes = resultats.filter((x) => !x.sur).length;
+    if (res.ids.length) avis(`Classement automatique : ${res.ids.length} opération(s)` + (doutes ? `, dont ${doutes} à vérifier` : ""));
+    return res;
+  } catch (e) {
+    console.error(e);
+    if (!silencieux) avis("Classement automatique impossible : " + e.message, true);
+    return null;
+  } finally { P.iaEnCours = false; majBarreOps(); }
 }
 
 /* ---------------------------------------------------------------- Résumé pour l'accueil NEXUS */
