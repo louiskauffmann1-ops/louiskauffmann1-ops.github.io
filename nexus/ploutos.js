@@ -4,6 +4,13 @@
 (function () {
 "use strict";
 const M = window.PloutosMoteur, K = window.PloutosCoffre;
+// Polices du système de design, chargées à part : sans réseau, PLOUTOS s'affiche quand même (polices de secours).
+if (!document.querySelector("link[data-ploutos-polices]")) {
+  const l = document.createElement("link");
+  l.rel = "stylesheet"; l.href = "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap";
+  l.setAttribute("data-ploutos-polices", "");
+  document.head.append(l);
+}
 
 /* ---------------------------------------------------------------- Outils */
 const fmtEuro = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" });
@@ -17,17 +24,29 @@ const aujourdhui = () => jourParis(new Date());
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 const memo = { lire(k, d) { try { const v = localStorage.getItem("ploutos-" + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
   ecrire(k, v) { try { localStorage.setItem("ploutos-" + k, JSON.stringify(v)); } catch {} } };
-const ICONE = (d) => { const g = s("svg", { viewBox: "0 0 24 24", "aria-hidden": "true" }); g.innerHTML = d; return g; };
+const ICONE = (d) => { const g = s("svg", { viewBox: "0 0 24 24", "aria-hidden": "true", class: "pl-ic" }); g.innerHTML = d; return g; };
 const I = {
   recherche: '<circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/>', fermer: '<path d="M6 6l12 12M18 6 6 18"/>', plus: '<path d="M12 5v14M5 12h14"/>',
   lien: '<path d="M8 12h8M6 8H5a4 4 0 0 0 0 8h1M18 8h1a4 4 0 0 1 0 8h-1"/>', fichier: '<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/>',
   synchro: '<path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/>', export: '<path d="M12 3v12M7 10l5 5 5-5M5 21h14"/>',
+  apercu: '<rect x="3" y="3" width="7" height="9" rx="2"/><rect x="14" y="3" width="7" height="5" rx="2"/><rect x="14" y="12" width="7" height="9" rx="2"/><rect x="3" y="16" width="7" height="5" rx="2"/>',
+  operations: '<path d="M8 6h13M8 12h13M8 18h13"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/>',
+  epargne: '<path d="M12 21c-4.4 0-8-3.1-8-7 0-3.1 2.3-5.7 5.5-6.6"/><path d="M12 21c4.4 0 8-3.1 8-7s-3.6-7-8-7"/><path d="M12 3v4M10 5h4"/>',
+  comptes: '<rect x="2.5" y="5" width="19" height="14" rx="3"/><path d="M2.5 10h19M6.5 15h4"/>',
+  reglages: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
+  alerte: '<path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17h.01"/>', fleche: '<path d="m9 6 6 6-6 6"/>',
 };
+/* Statuts en toutes lettres (contrat C17, C21) : jamais une coche seule. */
+const STATUTS = { atteste: ["Attesté", "vert"], calcule: ["Calculé", "miel"], ancien: ["Ancien", "corail"], inconnu: ["À saisir", "corail"] };
+const puce = (texte, ton = "", titre) => el("span", { class: "pl-puce " + ton, title: titre || null }, texte);
+const puceStatut = (statut, date) => { const [t, ton] = STATUTS[statut] || STATUTS.inconnu; return puce(t + (date ? " · au " + dateCourte(date) : ""), ton,
+  { atteste: "Lu dans un relevé ou saisi, sans opération depuis.", calcule: "Dernier solde connu + opérations importées depuis.", ancien: "Dernière information de plus de 3 jours : importe un relevé ou saisis le solde.", inconnu: "Aucun solde de référence : saisis celui affiché par ta banque." }[statut]); };
+const initiales = (nom) => { const m = nom.replace(/compte courant/i, "").split(/\s+/).filter(Boolean); return (m.length > 1 ? m[0][0] + m[1][0] : (m[0] || "?").slice(0, 2)).toUpperCase(); };
 
 const P = {
   coffre: null, etat: null, phase: "chargement", erreur: null,
   onglet: memo.lire("onglet", "apercu"), sousReglages: "categories",
-  filtres: { du: "", au: "", compte: "", cible: "", ...memo.lire("filtres", {}), periode: "mois", mois: "", q: "", aValider: false },
+  filtres: { du: "", au: "", compte: "", cible: "", ...memo.lire("filtres", {}), periode: "mois", mois: "", q: "", aValider: false, ids: null, titreIds: "", formule: "" },
   selection: new Set(), importsEnCours: null, racine: null, corps: null, liste: null, suggestion: null,
 };
 const E = () => P.etat;
@@ -97,8 +116,10 @@ async function faire(action, { redessiner = true } = {}) {
 }
 
 /* ---------------------------------------------------------------- Structure */
-// Peu d'onglets, des mots simples. Budgets et Épargne apparaîtront quand ils seront prêts ; Importer et Réglages sont des boutons.
-const ONGLETS = [["apercu", "Accueil"], ["operations", "Opérations"], ["comptes", "Comptes"]];
+// Fintech Premium : barre latérale sur ordinateur, pastilles en haut sur téléphone (la barre NEXUS occupe le bas).
+// Budgets arrivera avec P3 ; Importer et Paramètres sont des boutons à part.
+const ONGLETS = [["apercu", "Vue globale", "apercu"], ["operations", "Opérations", "operations"], ["epargne", "Épargne", "epargne"], ["comptes", "Comptes", "comptes"]];
+const TITRES = { apercu: "Vue globale", operations: "Opérations", epargne: "Épargne", comptes: "Comptes", importer: "Importer des relevés", reglages: "Paramètres" };
 const MOIS_NOMS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
 function vue() {
   if (!P.racine) {
@@ -111,51 +132,65 @@ function vue() {
 function aller(onglet, filtres) {
   P.onglet = onglet; memo.ecrire("onglet", onglet);
   if (onglet === "apercu" && !filtres && P.filtres.periode !== "mois") { P.filtres.periode = "mois"; P.filtres.aValider = false; }
+  if (!filtres || !("ids" in filtres)) Object.assign(P.filtres, { ids: null, titreIds: "", formule: "" });
   if (filtres) { Object.assign(P.filtres, filtres); memo.ecrire("filtres", { compte: P.filtres.compte, cible: P.filtres.cible, du: P.filtres.du, au: P.filtres.au }); }
   P.selection.clear();
   dessiner();
   if (P.racine.getBoundingClientRect().top < 0) scrollTo({ top: 0 });
 }
+/** « Justifier » un chiffre : la liste des opérations montre exactement celles qui le composent (contrat, section 5). */
+function justifier(titre, ids, formule = "") {
+  aller("operations", { ids: [...ids], titreIds: titre, formule, q: "", aValider: false });
+}
 function dessiner() {
   if (!P.racine) return;
-  const barre = el("nav", { class: "pl-onglets", "aria-label": "Sections de PLOUTOS" },
-    ONGLETS.map(([id, nom]) => {
-      const n = id === "operations" && P.etat ? Object.values(P.etat.operations).filter((o) => o.aValider).length : 0;
-      return el("button", { type: "button", class: "pl-onglet", "aria-current": P.onglet === id ? "page" : null, disabled: P.phase !== "pret", onclick: () => aller(id) },
-        nom, n ? el("b", { class: "pl-pastille", title: n + " à vérifier" }, String(n)) : null);
-    }));
   const pret = P.phase === "pret";
-  const actions = el("div", { class: "pl-actions" },
-    el("button", { type: "button", class: "pl-bouton" + (P.onglet === "importer" ? " actif" : ""), disabled: !pret, onclick: () => aller("importer") }, ICONE(I.plus), "Importer"),
-    el("button", { type: "button", class: "pl-bouton discret" + (P.onglet === "reglages" ? " actif" : ""), disabled: !pret, onclick: () => aller("reglages") }, "Réglages"));
-  const tete = el("div", { class: "pl-tete" }, barre, actions, el("button", { type: "button", class: "pl-statut", id: "pl-statut" }));
+  const nVerif = pret ? Object.values(P.etat.operations).filter((o) => o.aValider).length : 0;
+  const bouton = (id, nom, icone, extra) => el("button", { type: "button", class: "pl-onglet" + (extra || ""), "aria-current": P.onglet === id ? "page" : null, disabled: !pret, onclick: () => aller(id) },
+    ICONE(I[icone]), el("span", null, nom), id === "operations" && nVerif ? el("b", { class: "pl-pastille", title: nVerif + " à vérifier" }, String(nVerif)) : null);
+  const cote = el("nav", { class: "pl-cote", "aria-label": "Sections de PLOUTOS" },
+    el("div", { class: "pl-marque" }, el("span", { class: "pl-logo", "aria-hidden": "true" }, "P"), el("b", null, "Ploutos")),
+    el("div", { class: "pl-nav" }, ONGLETS.map(([id, nom, ic]) => bouton(id, nom, ic)), bouton("reglages", "Paramètres", "reglages", " secondaire")),
+    el("button", { type: "button", class: "pl-importer", disabled: !pret, "aria-current": P.onglet === "importer" ? "page" : null, onclick: () => aller("importer") }, ICONE(I.plus), el("span", null, "Importer")),
+    el("button", { type: "button", class: "pl-statut", id: "pl-statut" }));
   let corps;
   switch (P.phase) {
-    case "chargement": corps = el("div", { class: "vide" }, "Ouverture du coffre…"); break;
+    case "chargement": corps = el("div", { class: "pl-vide" }, "Ouverture du coffre…"); break;
     case "cle": corps = vueCle(); break;
     case "ancienne-cle": corps = vueAncienneCle(); break;
-    case "erreur": corps = panneau("Coffre indisponible", null, "alerte", el("p", null, P.erreur || "Erreur inconnue."), el("button", { class: "cmd", type: "button", onclick: () => location.reload() }, "Recharger")); break;
-    default: corps = ({ apercu: vueApercu, operations: vueOperations, comptes: vueComptes, importer: vueImporter, reglages: vueReglages }[P.onglet] || vueApercu)();
+    case "erreur": corps = carte("Coffre indisponible", null, el("p", null, P.erreur || "Erreur inconnue."), el("button", { class: "pl-btn", type: "button", onclick: () => location.reload() }, "Recharger")); break;
+    default: corps = ({ apercu: vueApercu, operations: vueOperations, epargne: vueEpargne, comptes: vueComptes, importer: vueImporter, reglages: vueReglages }[P.onglet] || vueApercu)();
   }
-  P.corps = el("div", { class: "pl-corps" }, corps);
-  P.racine.replaceChildren(tete, P.corps);
+  const recherche = pret ? el("label", { class: "pl-cherche-haut" }, ICONE(I.recherche),
+    el("input", { type: "search", placeholder: "Rechercher une opération", "aria-label": "Rechercher une opération", value: P.onglet === "operations" ? P.filtres.q : "",
+      onkeydown: (e) => { if (e.key === "Enter") aller("operations", { q: e.target.value, periode: "tout" }); } })) : null;
+  const haut = el("header", { class: "pl-haut" }, el("h1", null, TITRES[P.onglet] || "PLOUTOS"), P.onglet !== "operations" ? recherche : null);
+  const bandeau = DEMO ? el("div", { class: "pl-bandeau", role: "note" }, "Données fictives · rien n'est enregistré") : null;
+  P.corps = el("main", { class: "pl-zone" }, bandeau, haut, el("div", { class: "pl-corps" }, corps));
+  P.racine.replaceChildren(cote, P.corps);
+  const actif = cote.querySelector('[aria-current="page"]');
+  if (actif && innerWidth <= 760) requestAnimationFrame(() => { const a = actif.getBoundingClientRect(), c = cote.getBoundingClientRect(); cote.scrollLeft += a.left - c.left - 12; });
   dessinerStatut();
+}
+/** Carte de base du système de design (remplace le panneau NEXUS dans PLOUTOS). */
+function carte(titre, meta, ...contenu) {
+  return el("section", { class: "pl-carte" }, titre ? el("div", { class: "pl-carte-tete" }, el("h2", null, titre), meta || null) : null, ...contenu);
 }
 function dessinerStatut() {
   const z = P.racine && P.racine.querySelector("#pl-statut");
   if (!z || !P.coffre) return;
   const st = P.coffre.statut, n = P.coffre.attente.length;
   let texte, classe = "";
-  if (P.coffre.local) { texte = DEMO ? "Démo, rien n'est gardé" : "Sur cet appareil seulement"; classe = "ambre"; }
+  if (P.coffre.local) { texte = DEMO ? "Démo, rien n'est gardé" : "Sur cet appareil seulement"; classe = "miel"; }
   else if (st.etat === "synchro") texte = "Synchronisation…";
-  else if (st.etat === "hors-ligne") { texte = "Hors ligne" + (n ? " · " + n + " en attente" : ""); classe = "ambre"; }
-  else if (st.etat === "erreur") { texte = "Synchro en échec"; classe = "rouge"; }
-  else if (st.etat === "conflit-initial") { texte = "Choix à faire"; classe = "ambre"; }
-  else texte = n ? n + " en attente d'envoi" : "Synchronisé";
+  else if (st.etat === "hors-ligne") { texte = "Hors ligne" + (n ? " · " + n + " en attente" : ""); classe = "miel"; }
+  else if (st.etat === "erreur") { texte = "Synchro en échec"; classe = "corail"; }
+  else if (st.etat === "conflit-initial") { texte = "Choix à faire"; classe = "miel"; }
+  else texte = n ? n + " en attente d'envoi" : "Coffre synchronisé";
   z.className = "pl-statut " + classe;
-  z.replaceChildren(el("i"), texte);
+  z.replaceChildren(el("i"), el("span", null, texte));
   z.title = st.erreur || (P.coffre.local ? "Les données restent chiffrées sur cet appareil. Ajoute le jeton PLOUTOS_TOKEN pour les retrouver partout (guide, étape 9)." : "Coffre chiffré dans ton dépôt GitHub privé.");
-  z.onclick = () => aller("reglages") || (P.sousReglages = "donnees", dessiner());
+  z.onclick = () => { P.sousReglages = "donnees"; aller("reglages"); };
 }
 
 /* ---------------------------------------------------------------- Clé du coffre */
@@ -227,12 +262,16 @@ function filtreCible(o) {
   if (c === "_aucune") return !o.categorie;
   return o.categorie === c;
 }
+const rangOps = (etat) => (a, b) => M.dateRattachement(etat, b).localeCompare(M.dateRattachement(etat, a)) || b.dateValeur.localeCompare(a.dateValeur)
+  || (b.heure || "").localeCompare(a.heure || "") || b.montant - a.montant;
+/** Opérations de la période, rangées par mois de rattachement (date de débit, mois de paie) : mêmes règles que les calculs. */
 function opsFiltrees({ recherche = true } = {}) {
-  const { du, au } = bornes(), f = P.filtres;
-  const q = recherche && f.q.trim() ? M.compilerRecherche(E(), f.q) : null;
-  return Object.values(E().operations).filter((o) => o.date >= du && o.date <= au && (!f.compte || o.compte === f.compte) && filtreCible(o)
-    && (!recherche || !f.aValider || o.aValider) && (!q || q(o)))
-    .sort((a, b) => b.date.localeCompare(a.date) || (b.heure || "").localeCompare(a.heure || "") || b.montant - a.montant);
+  const etat = E(), f = P.filtres;
+  const q = recherche && f.q.trim() ? M.compilerRecherche(etat, f.q) : null;
+  if (recherche && f.ids) return f.ids.map((id) => etat.operations[id]).filter((o) => o && (!q || q(o))).sort(rangOps(etat));
+  const { du, au } = bornes();
+  return M.opsPeriode(etat, Object.values(etat.operations), du, au).filter((o) => (!f.compte || o.compte === f.compte) && filtreCible(o)
+    && (!recherche || !f.aValider || o.aValider) && (!q || q(o))).sort(rangOps(etat));
 }
 function nomCible(c) {
   if (!c) return "Toutes les catégories";
@@ -263,104 +302,139 @@ function barreFiltres({ recherche = false, auChangement }) {
   return el("div", { class: "pl-filtres" }, items);
 }
 
-/* ---------------------------------------------------------------- Vue d'ensemble */
-function tuileSolde(nom, s, compteId) {
-  let etat;
-  if (!s) etat = el("span", { class: "pl-etat" }, "Aucun relevé importé");
-  else if (s.inconnu) etat = el("button", { type: "button", class: "pl-etat ambre lien", onclick: () => saisirSolde(compteId) }, "Solde à saisir");
-  else if (s.verifie && s.age <= 3) etat = el("span", { class: "pl-etat vert", title: "Lu dans un relevé ou saisi le " + dateLongue(s.date) }, "✓ à jour le " + dateCourte(s.date));
-  else etat = el("button", { type: "button", class: "pl-etat ambre lien", onclick: () => saisirSolde(compteId),
-    title: `Dernier solde connu le ${dateLongue(s.date)}${s.mouvementsDepuis ? `, plus ${s.mouvementsDepuis} opération(s) importée(s) depuis` : ""}. Touche pour saisir le solde affiché par ta banque.` },
-    (s.verifie ? "Au " + dateCourte(s.date) : "Estimé") + " · mettre à jour");
-  return el("div", { class: "pl-tuile" }, el("div", { class: "pl-tuile-nom" }, nom),
-    el("div", { class: "pl-tuile-val" + (s && s.montant < 0 ? " negatif" : "") }, s && s.montant != null ? euros(s.montant) : "—"), etat);
+/* ---------------------------------------------------------------- Vue globale */
+const FORMULES = {
+  depenses: "Dépenses du mois moins les remboursements reçus, sans les virements entre tes comptes.",
+  revenus: "Salaire (mois de paie), aide familiale, intérêts et autres rentrées du mois.",
+  resultat: "Revenus moins dépenses du mois.",
+  misDeCote: "Versements vers l'épargne moins retraits, plus les intérêts.",
+};
+/** Patrimoine jour par jour (somme des comptes, dernier solde connu de chacun) pour la courbe du haut. */
+function courbePatrimoine(etat, jours = 90) {
+  const series = etat.config.comptes.map((c) => M.historiqueSolde(etat, c.id)).filter((x) => x.length);
+  if (!series.length) return [];
+  const fin = series.map((x) => x.at(-1).date).sort().at(-1);
+  const debut = new Date(Date.parse(fin) - (jours - 1) * 864e5).toISOString().slice(0, 10);
+  const points = [];
+  const idx = series.map(() => 0), vals = series.map(() => null);
+  for (let t = Date.parse(debut); t <= Date.parse(fin); t += 864e5) {
+    const d = new Date(t).toISOString().slice(0, 10);
+    series.forEach((x, i) => { while (idx[i] < x.length && x[idx[i]].date <= d) vals[i] = x[idx[i]++].montant; });
+    if (vals.some((v) => v != null)) points.push({ date: d, montant: vals.reduce((t2, v) => t2 + (v || 0), 0) });
+  }
+  return points;
+}
+function sparkline(points) {
+  if (points.length < 2) return null;
+  const W = 320, H = 72, min = Math.min(...points.map((p) => p.montant)), max = Math.max(...points.map((p) => p.montant)), e = max - min || 1;
+  const xy = points.map((p, i) => [i / (points.length - 1) * W, H - 6 - (p.montant - min) / e * (H - 12)]);
+  const ligne = xy.map(([x, y], i) => (i ? "L" : "M") + x.toFixed(1) + " " + y.toFixed(1)).join(" ");
+  const g = s("svg", { viewBox: `0 0 ${W} ${H}`, class: "pl-spark", role: "img", "aria-label": `Patrimoine sur ${points.length} jours : de ${euros(points[0].montant)} à ${euros(points.at(-1).montant)}` },
+    s("defs", null, s("linearGradient", { id: "pl-degrade", x1: 0, x2: 0, y1: 0, y2: 1 }, s("stop", { offset: "0", "stop-color": "var(--pl-vert)", "stop-opacity": ".28" }), s("stop", { offset: "1", "stop-color": "var(--pl-vert)", "stop-opacity": "0" }))),
+    s("path", { d: ligne + ` L${W} ${H} L0 ${H} Z`, fill: "url(#pl-degrade)" }),
+    s("path", { d: ligne, fill: "none", stroke: "var(--pl-vert)", "stroke-width": "2", "stroke-linejoin": "round", "stroke-linecap": "round" }));
+  return g;
+}
+function carteCompte(etat, c, sol) {
+  const montant = sol && sol.montant != null ? euros(sol.montant) : "—";
+  return el("button", { type: "button", class: "pl-compte", onclick: () => aller("comptes") },
+    el("span", { class: "pl-avatar", "aria-hidden": "true" }, initiales(c.nom)),
+    el("span", { class: "pl-compte-nom" }, c.nom.replace(/ compte courant$/i, "")),
+    el("b", { class: "pl-montant" + (sol && sol.montant < 0 ? " negatif" : "") }, montant),
+    sol ? puceStatut(sol.statut, sol.date) : puce("Aucun relevé"),
+    sol && sol.ecart ? puce("Écart " + euros(sol.ecart, { signe: true }), "corail", "Différence entre le solde saisi ou relevé et le solde calculé à la même date. Rien n'est corrigé en silence.") : null);
 }
 function vueApercu() {
   const etat = E(), ops = Object.values(etat.operations);
   if (!ops.length) return accueilVide();
-  const auj = aujourdhui();
-  const f = P.filtres;
-  const periode = opsFiltrees({ recherche: false });
-  const t = M.totaux(etat, periode);
-  const nomPeriode = f.periode === "mois" ? nomMois(moisChoisi(), moisChoisi().slice(0, 4) !== auj.slice(0, 4)).toLowerCase()
-    : f.periode === "annee" ? "l'année" : f.periode === "tout" ? "tout l'historique" : "la période";
-  const bilan = t.revenus - t.depenses;
+  const auj = aujourdhui(), f = P.filtres;
+  if (f.periode !== "mois") { f.periode = "mois"; }
+  const m = moisChoisi(), nom = nomMois(m, m.slice(0, 4) !== auj.slice(0, 4));
+  const r = M.indicateurs(etat, opsFiltrees({ recherche: false }));
+  const pat = M.patrimoine(etat, auj);
 
-  // Tuiles : un compte par tuile, puis le bilan de la période
-  const tuiles = etat.config.comptes.map((c) => tuileSolde(c.nom.replace(/ compte courant$/i, ""), M.solde(etat, c.id, auj), c.id));
-  tuiles.push(el("div", { class: "pl-tuile bilan" + (bilan < 0 ? " negatif" : "") },
-    el("div", { class: "pl-tuile-nom" }, (bilan >= 0 ? "Il te reste" : "Dépensé en plus") + (f.periode === "mois" ? " · " + nomMois(moisChoisi(), false).toLowerCase() : "")),
-    el("div", { class: "pl-tuile-val" }, euros(Math.abs(bilan))),
-    el("span", { class: "pl-etat" }, `revenus ${euros(t.revenus, { rond: true })} − dépenses ${euros(t.depenses, { rond: true })}`)));
+  // Patrimoine : la somme des comptes suivis, avec le statut du moins bon (C19)
+  const hero = el("section", { class: "pl-hero" },
+    el("div", { class: "pl-hero-gauche" },
+      el("div", { class: "pl-hero-tete" }, el("span", null, "Patrimoine"), puceStatut(pat.statut, pat.date)),
+      el("div", { class: "pl-hero-montant" }, pat.complet ? euros(pat.montant) : euros(pat.montant) + " *"),
+      el("p", { class: "pl-doux" }, pat.complet ? "Somme de tes comptes suivis. Les virements entre eux s'annulent." : "* Un compte n'a pas encore de solde de référence : saisis-le dans Comptes."),
+      sparkline(courbePatrimoine(etat))),
+    el("div", { class: "pl-comptes" }, pat.comptes.map((x) => carteCompte(etat, x.compte, x.solde))));
 
-  // Dépenses par groupe
-  const groupes = Object.entries(t.parGroupe).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
-  const max = groupes.length ? groupes[0][1] : 1;
-  const barres = groupes.length ? el("div", { class: "pl-barres" }, groupes.map(([gid, v]) => {
-    const g = M.groupe(etat, gid);
-    return el("button", { type: "button", class: "pl-barre-ligne", title: "Voir les opérations", onclick: () => aller("operations", { cible: gid === "_aucun" ? "_aucune" : "g:" + gid }) },
-      el("span", { class: "pl-barre-nom" }, g ? g.nom : "Pas encore classées"),
-      el("span", { class: "pl-barre-piste" }, el("i", { style: `width:${(v / max * 100).toFixed(1)}%;background:${g ? g.couleur : "var(--tres-doux)"}` })),
-      el("span", { class: "pl-barre-val" }, euros(v, { rond: true })));
-  })) : el("div", { class: "vide" }, "Aucune dépense sur la période.");
+  // Le mois : quatre chiffres, chacun justifiable
+  const kpi = (cle, titre, valeur, ids, ton, sous) => el("button", { type: "button", class: "pl-kpi", onclick: () => justifier(`${titre} · ${nom}`, ids, FORMULES[cle]), title: FORMULES[cle] },
+    el("span", { class: "pl-kpi-nom" }, titre), el("b", { class: "pl-montant " + (ton || "") }, valeur), sous ? el("span", { class: "pl-kpi-sous" }, sous) : null,
+    el("span", { class: "pl-justifier" }, "Justifier ", ICONE(I.fleche)));
+  const sousRevenus = [r.salaire.valeur ? "salaire " + euros(r.salaire.valeur, { rond: true }) : null, r.aide.valeur ? "aide " + euros(r.aide.valeur, { rond: true }) : null,
+    r.interets.valeur ? "intérêts " + euros(r.interets.valeur) : null, r.autresRevenus.valeur ? "autres " + euros(r.autresRevenus.valeur, { rond: true }) : null].filter(Boolean).join(" · ");
+  const kpis = el("div", { class: "pl-kpis" },
+    kpi("revenus", "Revenus", euros(r.revenus.valeur), r.revenus.ids, "positif", sousRevenus || null),
+    kpi("depenses", "Dépenses", euros(r.depenses.valeur), r.depenses.ids, "", r.remboursements.valeur ? "dont " + euros(r.remboursements.valeur) + " remboursés" : null),
+    kpi("resultat", "Résultat", euros(r.resultat.valeur, { signe: true }), r.resultat.ids, r.resultat.valeur >= 0 ? "positif" : "negatif",
+      r.tauxEpargne.valeur != null ? Math.round(r.tauxEpargne.valeur * 100) + " % des revenus" : null),
+    kpi("misDeCote", "Mis de côté", euros(r.misDeCote.valeur, { signe: true }), r.misDeCote.ids, "lilas", null));
 
-  // À vérifier : confirmer en un clic
-  const aVerifier = ops.filter((o) => o.aValider).sort((a, b) => b.date.localeCompare(a.date));
-  const ligneVerif = (o) => {
-    const c = o.categorie && M.categorie(etat, o.categorie);
-    return el("div", { class: "pl-verif" },
-      el("button", { type: "button", class: "pl-verif-nom", onclick: () => detailOperation(o.id) }, el("b", null, o.commercant),
-        el("span", { class: "secondaire" }, c ? c.nom + " ?" : "Catégorie inconnue")),
-      el("span", { class: "pl-op-montant" + (o.montant > 0 ? " positif" : "") }, euros(o.montant, { signe: true })),
-      c ? el("button", { type: "button", class: "pl-mini-bouton oui", title: "Oui, c'est bien " + c.nom, onclick: async () => { await faire({ type: "valider", ids: [o.id] }); } }, "Oui") : null,
-      el("button", { type: "button", class: "pl-mini-bouton", onclick: (e) => choisirCategorie(e.currentTarget, [o.id]) }, c ? "Changer" : "Classer"));
-  };
+  // Répartition par groupe : barre empilée + lignes
+  const groupes = Object.entries(r.parGroupe).filter(([, v]) => v.valeur !== 0).sort((a, b) => b[1].valeur - a[1].valeur);
+  const total = groupes.reduce((t, [, v]) => t + Math.max(0, v.valeur), 0) || 1;
+  const couleur = (gid) => M.groupe(etat, gid)?.couleur || "var(--pl-doux)";
+  const pile = el("div", { class: "pl-pile-barre", role: "img", "aria-label": "Répartition des dépenses par groupe" },
+    groupes.filter(([, v]) => v.valeur > 0).map(([gid, v]) => el("i", { style: `width:${(v.valeur / total * 100).toFixed(2)}%;background:${couleur(gid)}`, title: (M.groupe(etat, gid)?.nom || "Non classées") + " : " + euros(v.valeur) })));
+  const lignesGroupes = groupes.length ? el("div", { class: "pl-groupes" }, groupes.map(([gid, v]) => el("button", { type: "button", class: "pl-groupe-ligne", onclick: () => justifier(`${M.groupe(etat, gid)?.nom || "Non classées"} · ${nom}`, v.ids, FORMULES.depenses) },
+    el("i", { style: "background:" + couleur(gid) }), el("span", null, M.groupe(etat, gid)?.nom || "Pas encore classées"),
+    el("span", { class: "pl-doux" }, Math.round(v.valeur / total * 100) + " %"), el("b", { class: "pl-montant" }, euros(v.valeur))))) : el("p", { class: "pl-doux" }, "Aucune dépense ce mois-ci.");
 
-  const choixPeriode = navigateurMois(dessiner);
+  // Alertes : sur tout l'historique, tant qu'elles ne sont pas traitées
+  const tout = M.indicateurs(etat, ops);
+  const alertes = [];
+  if (tout.aRapprocher.nombre) alertes.push(el("button", { type: "button", class: "pl-alerte miel", onclick: () => justifier("Virements à rapprocher", tout.aRapprocher.ids, "Virements vers ou depuis un compte à toi dont l'autre côté manque. Ils ne comptent ni en dépense ni en revenu tant qu'ils ne sont pas réglés.") },
+    ICONE(I.alerte), el("span", null, el("b", null, tout.aRapprocher.nombre + (tout.aRapprocher.nombre > 1 ? " virements à rapprocher" : " virement à rapprocher")), el("span", null, "L'autre côté manque. Exclus des dépenses en attendant.")), ICONE(I.fleche)));
+  if (tout.aVerifier.nombre) alertes.push(el("button", { type: "button", class: "pl-alerte", onclick: () => justifier("À vérifier", tout.aVerifier.ids, "Classement incertain, reprise ou doublon possible : confirme ou corrige.") },
+    ICONE(I.alerte), el("span", null, el("b", null, tout.aVerifier.nombre + " à vérifier"), el("span", null, "Classement incertain ou doublon possible.")), ICONE(I.fleche)));
+  if (tout.horsPerimetre.valeur) alertes.push(el("button", { type: "button", class: "pl-alerte discret", onclick: () => justifier("Vers des comptes non suivis", tout.horsPerimetre.ids, "Argent envoyé vers un compte à toi que PLOUTOS ne suit pas : ni dépense, ni revenu.") },
+    ICONE(I.comptes), el("span", null, el("b", null, euros(-tout.horsPerimetre.valeur) + " vers des comptes non suivis"), el("span", null, "Ni dépense ni revenu.")), ICONE(I.fleche)));
 
+  const recentes = ops.sort((a, b) => b.dateValeur.localeCompare(a.dateValeur) || (b.heure || "").localeCompare(a.heure || "")).slice(0, 6);
   return el("div", { class: "pl-pile" },
-    el("div", { class: "pl-tuiles accueil" }, tuiles),
-    el("div", { class: "grille" },
-      el("div", { class: "s7" }, el("section", { class: "panneau pl-carte" },
-        el("div", { class: "pl-carte-tete" }, el("h2", null, "Dépenses " + (/^[aeiouéèâ]/i.test(nomPeriode) ? "d'" : "de ") + nomPeriode), choixPeriode),
-        el("p", { class: "pl-carte-sous" }, el("b", null, euros(t.depenses)), ` dépensés · ${euros(t.revenus)} reçus` + (t.salaire ? ` dont ${euros(t.salaire)} de salaire` : "")),
-        barres)),
-      el("div", { class: "s5" }, el("section", { class: "panneau pl-carte" + (aVerifier.length ? " attention" : "") },
-        el("div", { class: "pl-carte-tete" }, el("h2", null, "À vérifier", aVerifier.length ? el("span", { class: "pl-compte" }, String(aVerifier.length)) : null)),
-        aVerifier.length ? [
-          el("p", { class: "pl-carte-sous" }, "PLOUTOS n'est pas sûr de ces opérations. Confirme ou change la catégorie : il retient ta réponse."),
-          el("div", { class: "pl-verifs" }, aVerifier.slice(0, 6).map(ligneVerif)),
-          aVerifier.length > 6 ? el("button", { type: "button", class: "pl-lien", onclick: () => { aller("operations", { periode: "tout", cible: "", compte: "" }); P.filtres.aValider = true; dessiner(); } }, `Voir les ${aVerifier.length}`) : null,
-        ] : el("p", { class: "pl-carte-sous" }, "✓ Tout est classé."))),
-      el("div", { class: "s12" }, el("section", { class: "panneau pl-carte" },
-        el("div", { class: "pl-carte-tete" }, el("h2", null, "Les 12 derniers mois")),
-        graphiqueMois(M.parMois(etat, ops, 12, auj))))));
+    hero,
+    alertes.length ? el("div", { class: "pl-alertes" }, alertes) : null,
+    el("div", { class: "pl-grille" },
+      el("section", { class: "pl-carte pl-mois-carte" },
+        el("div", { class: "pl-carte-tete" }, el("h2", null, "Bilan du mois"), navigateurMois(dessiner)),
+        kpis, pile, lignesGroupes),
+      carte("Dernières opérations", el("button", { type: "button", class: "pl-lien", onclick: () => aller("operations", { periode: "tout", cible: "", compte: "" }) }, "Tout voir"),
+        el("div", { class: "pl-recentes" }, recentes.map(ligneCompacte)))),
+    carte("Les 12 derniers mois", el("span", { class: "pl-doux" }, "par mois de rattachement · sans les virements internes"), graphiqueMois(M.parMois(etat, ops, 12, auj))));
 }
 function accueilVide() {
-  return el("div", { class: "grille" }, el("div", { class: "s8" }, panneau("Bienvenue dans PLOUTOS", null, "",
-    el("ol", { class: "etapes" },
-      el("li", null, el("span", null, "Exporte tes relevés LCL et Revolut au format CSV ou Excel, depuis l'appli ou le site de chaque banque.")),
-      el("li", null, el("span", null, "Dépose-les dans l'onglet Importer : PLOUTOS reconnaît la banque, écarte les doublons et repère tes virements entre comptes.")),
-      el("li", null, el("span", null, "Corrige les quelques opérations à valider : chaque correction peut devenir une règle automatique."))),
-    el("button", { type: "button", class: "cmd pl-principal", onclick: () => aller("importer") }, "Importer mes relevés"))));
+  return el("div", { class: "pl-pile" }, el("section", { class: "pl-carte pl-bienvenue" },
+    el("h2", null, "Aucun relevé pour l'instant"),
+    el("p", { class: "pl-doux" }, "PLOUTOS ne se connecte pas à ta banque et ne garde aucun identifiant. Tu exportes un relevé CSV ou Excel depuis LCL ou Revolut, et tu le déposes ici."),
+    el("ol", { class: "pl-etapes" },
+      el("li", null, "Exporte le relevé de chaque compte."),
+      el("li", null, "Dépose les fichiers, plusieurs à la fois : les doublons et les virements entre tes comptes sont repérés."),
+      el("li", null, "Vérifie le rapport, puis confirme. Rien n'est enregistré avant.")),
+    el("button", { type: "button", class: "pl-btn principal", onclick: () => aller("importer") }, ICONE(I.plus), "Importer mes relevés")));
 }
-function graphiqueMois(mois) {
-  const max = Math.max(1, ...mois.map((m) => Math.max(m.depenses, m.revenus)));
-  const W = 720, H = 200, bas = 170, lg = W / mois.length;
-  const g = s("svg", { viewBox: `0 0 ${W} ${H}`, class: "pl-graph", role: "img", "aria-label": "Dépenses et revenus des 12 derniers mois" });
-  for (let i = 0; i <= 2; i++) g.append(s("line", { x1: 0, x2: W, y1: bas - (bas - 14) * i / 2, y2: bas - (bas - 14) * i / 2, stroke: "rgba(120,200,255,.12)" }));
+function graphiqueMois(mois, { series = [["revenus", "Revenus", "var(--pl-vert)"], ["depenses", "Dépenses", "var(--pl-lilas)"]] } = {}) {
+  const max = Math.max(1, ...mois.flatMap((m) => series.map(([k]) => Math.abs(m[k]))));
+  const W = 720, H = 200, bas = 170, lg = W / mois.length, n = series.length;
+  const g = s("svg", { viewBox: `0 0 ${W} ${H}`, class: "pl-graph", role: "img", "aria-label": series.map((x) => x[1]).join(" et ") + " des 12 derniers mois" });
+  for (let i = 0; i <= 2; i++) g.append(s("line", { x1: 0, x2: W, y1: bas - (bas - 14) * i / 2, y2: bas - (bas - 14) * i / 2, stroke: "var(--pl-ligne)" }));
   mois.forEach((m, i) => {
-    const x = i * lg, w = Math.min(18, lg / 3);
-    const h1 = (bas - 14) * m.revenus / max, h2 = (bas - 14) * m.depenses / max;
-    const titre = `${MOIS_LONGS[Number(m.mois.slice(5)) - 1]} ${m.mois.slice(0, 4)} : revenus ${euros(m.revenus)}, dépenses ${euros(m.depenses)}`;
-    const grp = s("g", { class: "pl-graph-mois" }, s("title", null, titre),
-      s("rect", { x: x + lg / 2 - w - 1, y: bas - h1, width: w, height: Math.max(h1, 0), fill: "var(--ploutos)", opacity: ".85" }),
-      s("rect", { x: x + lg / 2 + 1, y: bas - h2, width: w, height: Math.max(h2, 0), fill: "var(--ambre)", opacity: ".85" }),
-      s("text", { x: x + lg / 2, y: H - 10, "text-anchor": "middle" }, MOIS_COURTS[Number(m.mois.slice(5)) - 1]));
+    const x = i * lg, w = Math.min(16, lg / (n + 1.5));
+    const titre = `${MOIS_LONGS[Number(m.mois.slice(5)) - 1]} ${m.mois.slice(0, 4)} : ` + series.map(([k, nomS]) => `${nomS.toLowerCase()} ${euros(m[k])}`).join(", ");
+    const grp = s("g", { class: "pl-graph-mois" }, s("title", null, titre));
+    series.forEach(([k, , c], j) => {
+      const h = (bas - 14) * Math.abs(m[k]) / max;
+      grp.append(s("rect", { x: x + lg / 2 - (n * (w + 2)) / 2 + j * (w + 2), y: bas - h, width: w, height: Math.max(h, 0), rx: 4, fill: m[k] < 0 ? "var(--pl-corail)" : c }));
+    });
+    grp.append(s("text", { x: x + lg / 2, y: H - 10, "text-anchor": "middle" }, MOIS_COURTS[Number(m.mois.slice(5)) - 1]));
     g.append(grp);
   });
-  return el("div", null, g, el("div", { class: "pl-legende" }, el("span", null, el("i", { style: "background:var(--ploutos)" }), "Revenus"), el("span", null, el("i", { style: "background:var(--ambre)" }), "Dépenses"),
-    el("span", { class: "secondaire" }, "Sans les virements entre tes comptes")));
+  return el("div", null, g, el("div", { class: "pl-legende" }, series.map(([, nomS, c]) => el("span", null, el("i", { style: "background:" + c }), nomS)),
+    el("span", { class: "pl-doux" }, "montants arrondis à l'affichage")));
 }
 
 /* ---------------------------------------------------------------- Opérations */
@@ -392,25 +466,44 @@ function majOnglets() {
 }
 function ligneCompacte(o) {
   return el("div", { class: "pl-op compacte", onclick: () => detailOperation(o.id) },
-    el("span", { class: "pl-op-date" }, dateCourte(o.date)),
-    el("span", { class: "pl-op-nom" }, el("b", null, o.commercant), el("span", { class: "secondaire" }, M.compte(E(), o.compte)?.nom || "")),
-    pastilleCategorie(o),
+    el("span", { class: "pl-avatar petit", "aria-hidden": "true" }, initiales(o.commercant || "?")),
+    el("span", { class: "pl-op-nom" }, el("b", null, o.commercant), el("span", { class: "pl-doux" }, dateCourte(o.dateValeur) + " · " + (M.compte(E(), o.compte)?.nom || ""))),
     el("span", { class: "pl-op-montant" + (o.montant > 0 ? " positif" : "") }, euros(o.montant, { signe: true })));
+}
+/** Provenance du classement (contrat C22) : toi, règle, règle de base, IA, virement, reprise. */
+function provenance(o) {
+  if (!o.source || o.source === "aucune") return null;
+  if (o.source === "manuel") return ["Toi", "Classée à la main"];
+  if (o.source === "virement") return ["Auto", "Virement interne repéré automatiquement"];
+  if (o.source === "ia") return ["IA", "Proposée par l'IA"];
+  if (o.source === "reprise") return ["Reprise", "Annule une opération du même tiers"];
+  if (o.source.startsWith("regle:")) return o.source.startsWith("regle:base-") ? ["Base", "Règle de base"] : ["Règle", "Ta règle"];
+  return null;
+}
+/** Pastilles d'état d'une opération : nature particulière, à vérifier, mois de rattachement décalé. */
+function badgesOperation(etat, o) {
+  const b = [], n = M.natureOp(etat, o);
+  if (n === "interne") b.push(puce(o.lien ? "Interne ↔" : "Interne", "", "Virement entre tes comptes : ni dépense ni revenu"));
+  if (n === "rapprocher") b.push(puce("À rapprocher", "miel", "L'autre côté de ce virement manque : exclu des dépenses et revenus"));
+  if (n === "hors") b.push(puce("Compte non suivi", "", "Vers un compte à toi que PLOUTOS ne suit pas"));
+  if (n === "remboursement") b.push(puce("Remboursement", "vert", "Déduit des dépenses de sa catégorie"));
+  if (o.doublonPossible) b.push(puce("Doublon ?", "corail"));
+  else if (o.aValider && o.categorie) b.push(puce("À vérifier", "miel", "Classement incertain : vérifie-le puis valide"));
+  if (M.decale(etat, o)) b.push(puce("compté en " + nomMois(M.moisDe(etat, o), false).toLowerCase(), "lilas", "Mois de rattachement différent du mois de débit (mois de paie ou choix manuel)"));
+  return b;
 }
 function ligneOperation(o) {
   const etat = E(), compte = M.compte(etat, o.compte);
-  const badges = [];
-  if (o.nature === "interne") badges.push(el("span", { class: "pl-badge" }, o.lien ? "INTERNE ↔" : "INTERNE · CONTREPARTIE ATTENDUE"));
-  if (o.doublonPossible) badges.push(el("span", { class: "pl-badge rouge" }, "DOUBLON ?"));
-  else if (o.aValider && o.categorie) badges.push(el("span", { class: "pl-badge ambre", title: "Classement incertain : vérifie-le puis valide" }, "À VÉRIFIER"));
-  if (o.source === "manuel") badges.push(el("span", { class: "pl-badge discret", title: "Classée à la main" }, "MANUEL"));
+  const badges = badgesOperation(etat, o);
+  const prov = provenance(o);
+  if (prov) badges.push(puce(prov[0], prov[0] === "IA" ? "lilas discret" : "discret", prov[1]));
   const coche = el("input", { type: "checkbox", "aria-label": "Sélectionner", checked: P.selection.has(o.id),
     onclick: (e) => e.stopPropagation(), onchange: (e) => { e.target.checked ? P.selection.add(o.id) : P.selection.delete(o.id); majBarreOps(); } });
   return el("div", { class: "pl-op" + (o.aValider ? " a-valider" : "") + (P.selection.has(o.id) ? " choisie" : ""), "data-id": o.id, onclick: () => detailOperation(o.id), role: "row" },
     el("span", { class: "pl-op-coche" }, coche),
-    el("span", { class: "pl-op-date" }, dateCourte(o.date)),
-    el("span", { class: "pl-op-nom" }, el("b", null, o.commercant, ...badges.map((b) => [" ", b])),
-      el("span", { class: "secondaire" }, (compte ? compte.nom : o.compte) + " · " + o.libelle)),
+    el("span", { class: "pl-op-date", title: o.date !== o.dateValeur ? "Achat le " + dateLongue(o.date) : null }, dateCourte(o.dateValeur)),
+    el("span", { class: "pl-op-nom" }, el("span", { class: "pl-op-titre" }, el("b", null, o.commercant), ...badges),
+      el("span", { class: "pl-doux" }, (compte ? compte.nom : o.compte) + " · " + o.libelle)),
     pastilleCategorie(o),
     el("span", { class: "pl-op-montant" + (o.montant > 0 ? " positif" : "") }, euros(o.montant, { signe: true })));
 }
@@ -425,15 +518,17 @@ function listeVirtuelle(obtenir) {
   // Une ligne d'en-tête par mois (nom, dépenses, rentrées), puis ses opérations.
   function decouper() {
     lignes = []; let m = null, tete = null;
+    const etat = E();
     for (const o of ops) {
-      if (o.date.slice(0, 7) !== m) { m = o.date.slice(0, 7); tete = { entete: m, depenses: 0, revenus: 0, n: 0 }; lignes.push(tete); }
-      tete.n++;
-      if (o.nature === "depense" && o.montant < 0) tete.depenses -= o.montant; else if (o.nature === "revenu" && o.montant > 0) tete.revenus += o.montant;
+      const mo = M.moisDe(etat, o);
+      if (mo !== m) { m = mo; tete = { entete: m, ops: [] }; lignes.push(tete); }
+      tete.ops.push(o);
       lignes.push(o);
     }
+    for (const t of lignes) if (t.entete) { const r = M.indicateurs(etat, t.ops); Object.assign(t, { n: t.ops.length, depenses: r.depenses.valeur, revenus: r.revenus.valeur }); delete t.ops; }
   }
   const ligneMois = (x) => el("div", { class: "pl-op-mois", role: "row" }, el("b", null, nomMois(x.entete)),
-    el("span", null, x.n + " op. · dépenses ", el("b", null, euros(x.depenses, { rond: true })), " · rentrées ", el("b", { class: "positif" }, euros(x.revenus, { rond: true }))));
+    el("span", null, x.n + " op. · dépenses ", el("b", null, euros(x.depenses)), " · revenus ", el("b", { class: "positif" }, euros(x.revenus))));
   function peindre(force) {
     const h = haut(), vue = zone.clientHeight || 600;
     const d = Math.max(0, Math.floor(zone.scrollTop / h) - 8), f = Math.min(lignes.length, Math.ceil((zone.scrollTop + vue) / h) + 8);
@@ -451,20 +546,25 @@ function vueOperations() {
     "aria-label": "Rechercher dans les opérations", oninput: (e) => { clearTimeout(vueOperations.t); vueOperations.t = setTimeout(() => { P.filtres.q = e.target.value; P.selection.clear(); P.liste.maj(); majBarreOps(); }, 120); } });
   P.liste = listeVirtuelle(() => opsFiltrees());
   P.barreOps = el("div", { class: "pl-resume" });
+  const f = P.filtres;
+  const justif = f.ids ? el("div", { class: "pl-justif" },
+    el("div", null, el("span", { class: "pl-doux" }, "Justification"), el("b", null, f.titreIds), f.formule ? el("span", { class: "pl-doux" }, f.formule) : null),
+    el("button", { type: "button", class: "pl-btn", onclick: () => aller("operations") }, "Voir toutes les opérations")) : null;
   const vueEl = el("div", { class: "pl-pile" },
+    justif,
     el("div", { class: "pl-cherche" }, ICONE(I.recherche), recherche),
-    barreFiltres({ recherche: true, auChangement: () => { P.liste.maj(); majBarreOps(); dessinerFiltres(); } }),
+    f.ids ? null : barreFiltres({ recherche: true, auChangement: () => { P.liste.maj(); majBarreOps(); dessinerFiltres(); } }),
     P.barreOps,
     el("div", { class: "pl-entete-liste", "aria-hidden": "true" }, el("span"), el("span", null, "Date"), el("span", null, "Opération"), el("span", null, "Catégorie"), el("span", null, "Montant")),
     P.liste.zone);
   requestAnimationFrame(() => { P.liste.maj(); majBarreOps(); });
   setTimeout(() => { if (P.filtres.q) recherche.focus(); }, 0);
   return vueEl;
-  function dessinerFiltres() { const ancien = vueEl.querySelector(".pl-filtres"); ancien.replaceWith(barreFiltres({ recherche: true, auChangement: () => { P.liste.maj(); majBarreOps(); dessinerFiltres(); } })); }
+  function dessinerFiltres() { const ancien = vueEl.querySelector(".pl-filtres"); if (ancien) ancien.replaceWith(barreFiltres({ recherche: true, auChangement: () => { P.liste.maj(); majBarreOps(); dessinerFiltres(); } })); }
 }
 function majBarreOps() {
   if (!P.barreOps) return;
-  const ops = P.liste.ops(), t = M.totaux(E(), ops);
+  const ops = P.liste.ops(), ind = M.indicateurs(E(), ops), t = { depenses: ind.depenses.valeur, revenus: ind.revenus.valeur };
   const sel = [...P.selection].filter((id) => E().operations[id]);
   const tout = el("input", { type: "checkbox", "aria-label": "Tout sélectionner", checked: sel.length > 0 && sel.length === ops.length,
     onchange: (e) => { P.selection = new Set(e.target.checked ? ops.map((o) => o.id) : []); P.liste.maj(); majBarreOps(); } });
@@ -663,7 +763,7 @@ function editeurRegle(regle, { nouvelle = false } = {}) {
     const cibles = M.operationsCibles(etat, r);
     const autres = cibles.filter((o) => o.categorie !== r.action.categorie);
     apercu.replaceChildren(el("div", null, el("b", null, String(cibles.length)), " opération(s) déjà importée(s) correspondent", autres.length !== cibles.length ? ` (dont ${autres.length} à reclasser)` : "", ". Les corrections manuelles ne sont jamais touchées."),
-      el("ul", { class: "liste" }, cibles.slice(0, 5).map((o) => el("li", null, el("div", { class: "pl-mini" }, el("span", null, dateCourte(o.date)), el("span", null, o.commercant), el("span", { class: "secondaire" }, o.libelle), el("span", null, euros(o.montant, { signe: true })))))));
+      el("ul", { class: "liste" }, cibles.slice(0, 5).map((o) => el("li", null, el("div", { class: "pl-mini" }, el("span", null, dateCourte(o.dateValeur)), el("span", null, o.commercant), el("span", { class: "secondaire" }, o.libelle), el("span", null, euros(o.montant, { signe: true })))))));
   }
   const contenu = el("div", { class: "pl-form" },
     el("div", { class: "pl-tuile-nom" }, "Conditions"), zoneConds,
@@ -690,9 +790,17 @@ function detailOperation(id) {
   const etat = E(), o = etat.operations[id];
   if (!o) return;
   const compte = M.compte(etat, o.compte), lie = o.lien && etat.operations[o.lien], proche = o.doublonPossible && etat.operations[o.doublonPossible];
-  const imp = etat.imports.find((i) => i.id === o.import);
+  const imps = M.provenances(o).map((id) => etat.imports.find((i) => i.id === id)).filter(Boolean);
+  const nature = M.natureOp(etat, o);
+  const reprise = o.reprise && etat.operations[o.reprise];
   const source = o.source === "manuel" ? "Corrigée à la main" : o.source === "virement" ? "Virement interne repéré automatiquement"
+    : o.source === "ia" ? "Proposée par l'IA" : o.source === "reprise" ? "Reprise d'une opération du même tiers"
     : o.source && o.source.startsWith("regle:") ? "Règle : " + regleDe(o.source.slice(6)) : "Aucune règle ne correspond";
+  const NATURES = { depense: "Dépense", remboursement: "Remboursement (déduit des dépenses)", revenu: "Revenu", interne: "Virement entre tes comptes", rapprocher: "Virement à rapprocher (exclu des totaux)", hors: "Vers un compte non suivi (à part)" };
+  const moisAuto = (() => { const x = { ...o, moisForce: null }; return M.moisDe(etat, x); })();
+  const choixMois = el("select", { "aria-label": "Mois de rattachement", onchange: async (e) => {
+    const v = e.target.value; await faire({ type: "rattacher", ids: [id], mois: v === moisAuto ? null : v }, { redessiner: false }); rafraichirVue(); avis("Compté en " + nomMois(v).toLowerCase()); } },
+    [-1, 0, 1].map((k) => decalerMois(o.dateValeur.slice(0, 7), k)).map((mo) => el("option", { value: mo, selected: M.moisDe(etat, o) === mo }, nomMois(mo) + (mo === moisAuto ? " (automatique)" : ""))));
   const note = el("textarea", { rows: 2, placeholder: "Ajouter une note…", "aria-label": "Note" }, o.note || "");
   const histo = etat.journal.filter((j) => j.details && Array.isArray(j.details.ids) && j.details.ids.includes(id)).slice(-8).reverse();
   let d;
@@ -704,15 +812,24 @@ function detailOperation(id) {
     ["Montant", el("b", { class: o.montant > 0 ? "positif" : "" }, euros(o.montant, { signe: true }))],
     ["Catégorie", pastilleCategorie(o)],
     ["Compte", compte ? compte.nom : o.compte],
-    ["Date", dateLongue(o.date) + (o.heure ? " · " + o.heure.slice(0, 5) : "") + (o.dateValeur !== o.date ? ` (débitée le ${dateLongue(o.dateValeur)})` : "")],
+    ["Nature", NATURES[nature]],
+    ["Débitée le", dateLongue(o.dateValeur) + (o.heure ? " · " + o.heure.slice(0, 5) : "")],
+    o.date !== o.dateValeur ? ["Achetée le", dateLongue(o.date)] : null,
+    ["Comptée en", choixMois],
     ["Libellé d'origine", el("code", null, o.libelle)],
     ["Type", o.type || "—"],
     ["Classement", source],
-    ["Import", imp ? `${imp.fichier || "fichier"} · ${dateLongue(imp.t.slice(0, 10))}` : "—"],
-  ];
+    ["Lue dans", imps.length ? imps.map((i) => `${i.fichier || "fichier"} (${dateCourte(i.t.slice(0, 10))})`).join(", ") : "—"],
+  ].filter(Boolean);
   const blocs = [el("dl", { class: "pl-dl" }, lignes.flatMap(([k, v]) => [el("dt", null, k), el("dd", null, v)]))];
   if (lie) blocs.push(el("div", { class: "pl-encart" }, el("b", null, "Virement entre tes comptes"), el("span", null, ` lié à ${euros(lie.montant, { signe: true })} sur ${M.compte(etat, lie.compte)?.nom} le ${dateLongue(lie.date)} (« ${lie.libelle} »). Il ne compte ni en dépense ni en revenu.`)));
-  else if (o.nature === "interne") blocs.push(el("div", { class: "pl-encart" }, el("b", null, "Mouvement interne"), el("span", null, " : l'autre côté n'est pas encore importé. Il sera lié automatiquement au prochain import.")));
+  else if (nature === "rapprocher") blocs.push(el("div", { class: "pl-encart miel" }, el("b", null, "Virement à rapprocher"),
+    el("span", null, " : il ressemble à un virement vers ou depuis un compte à toi, mais l'autre côté manque. Il est exclu des dépenses et revenus en attendant. S'il arrive au prochain import, il sera lié tout seul."),
+    el("div", { class: "pl-boutons" },
+      el("button", { type: "button", class: "pl-btn", onclick: () => { d.fermer(); lierA(id); } }, ICONE(I.lien), "Lier à l'autre côté…"),
+      el("button", { type: "button", class: "pl-btn", onclick: async () => { d.fermer(); await faire({ type: "categoriser", ids: [id], categorie: M.ID_CATEGORIE.nonSuivi }, { redessiner: false }); rafraichirVue(); avis("Compté à part : vers un compte non suivi."); } }, "Compte à moi non suivi"),
+      el("button", { type: "button", class: "pl-btn", onclick: (e) => choisirCategorie(e.currentTarget, [id]) }, o.montant < 0 ? "C'est une dépense…" : "C'est une rentrée…"))));
+  if (reprise) blocs.push(el("div", { class: "pl-encart" }, el("b", null, "Reprise"), el("span", null, ` : annule ${euros(reprise.montant, { signe: true })} du ${dateLongue(reprise.dateValeur)} (« ${reprise.libelle} »). Les deux s'annulent dans les totaux.`)));
   if (proche) blocs.push(el("div", { class: "pl-encart rouge" }, el("b", null, "Doublon possible"), el("span", null, ` : une opération du même jour et du même montant existe déjà (« ${proche.libelle} »).`),
     el("div", { class: "pl-boutons" },
       el("button", { type: "button", class: "cmd pl-danger", onclick: async () => { d.fermer(); await faire({ type: "supprimer-operations", ids: [id] }, { redessiner: false }); rafraichirVue(); avis("Doublon supprimé."); } }, "C'est un doublon : supprimer"),
@@ -730,12 +847,12 @@ function regleDe(idRegle) {
 }
 function lierA(id) {
   const etat = E(), o = etat.operations[id];
-  const candidats = Object.values(etat.operations).filter((x) => x.compte !== o.compte && x.montant === -o.montant && M.ecartJours(x.date, o.date) <= 10)
-    .sort((a, b) => M.ecartJours(a.date, o.date) - M.ecartJours(b.date, o.date));
+  const candidats = Object.values(etat.operations).filter((x) => x.compte !== o.compte && x.montant === -o.montant && M.ecartJours(x.dateValeur, o.dateValeur) <= 10)
+    .sort((a, b) => M.ecartJours(a.dateValeur, o.dateValeur) - M.ecartJours(b.dateValeur, o.dateValeur));
   dialogue("Lier à un virement", candidats.length ? el("div", null, el("p", null, `Opérations de ${euros(-o.montant, { signe: true })} sur un autre compte, à 10 jours au plus :`),
     el("ul", { class: "liste" }, candidats.map((x) => el("li", null, el("button", { type: "button", class: "pl-mini bouton", onclick: async (e) => { e.target.closest(".pl-voile").remove(); await faire({ type: "lier", a: id, b: x.id }, { redessiner: false }); rafraichirVue(); avis("Virement interne lié."); } },
       el("span", null, dateCourte(x.date)), el("span", null, M.compte(etat, x.compte)?.nom), el("span", { class: "secondaire" }, x.libelle), el("span", null, euros(x.montant, { signe: true })))))))
-    : el("p", null, "Aucune opération de montant opposé sur tes autres comptes. Importe l'autre relevé, ou classe-la en « Mouvements internes » si elle va vers un compte que PLOUTOS ne suit pas."));
+    : el("p", null, "Aucune opération de montant opposé sur tes autres comptes. Importe l'autre relevé, ou classe-la en « Compte non suivi » si elle va vers un compte à toi que PLOUTOS ne suit pas."));
 }
 
 /* ---------------------------------------------------------------- Comptes */
@@ -743,43 +860,95 @@ function saisirSolde(compteId) {
   const c = M.compte(E(), compteId);
   const montant = el("input", { type: "text", inputmode: "decimal", placeholder: "ex. 1 234,56", "aria-label": "Solde" });
   const date = el("input", { type: "date", value: aujourdhui(), "aria-label": "Date" });
+  const avec = el("input", { type: "radio", name: "pl-jour", checked: true }), sans = el("input", { type: "radio", name: "pl-jour" });
   dialogue("Solde de référence · " + c.nom, el("div", { class: "pl-form" },
-    el("p", { class: "secondaire" }, "Le solde affiché par ta banque à cette date, toutes opérations comprises. PLOUTOS s'en sert comme point de départ vérifié."),
-    el("label", null, "Solde (€)", montant), el("label", null, "Au", date)), [
+    el("p", { class: "pl-doux" }, "Le solde affiché par ta banque. PLOUTOS s'en sert comme point de départ attesté, et te montre l'écart avec son propre calcul."),
+    el("label", null, "Solde (€)", montant), el("label", null, "Au", date),
+    el("fieldset", { class: "pl-choix-jour" }, el("legend", null, "Ce solde inclut-il déjà les opérations de ce jour-là ?"),
+      el("label", { class: "pl-bascule" }, avec, "Oui, elles sont déjà dedans"),
+      el("label", { class: "pl-bascule" }, sans, "Non, c'est le solde du matin"))), [
     ["Annuler", (f) => f()],
     ["Enregistrer", async (f) => {
       const v = M.centimes(montant.value);
       if (v == null || !date.value) return avis("Montant ou date invalide.", true);
-      f(); await faire({ type: "solde", compte: compteId, date: date.value, montant: v }); avis("Solde enregistré.");
+      f(); await faire({ type: "solde", compte: compteId, date: date.value, montant: v, inclutJour: avec.checked });
+      const ref = E().config.soldes.filter((x) => x.compte === compteId && x.source === "saisie").at(-1);
+      avis(ref && ref.ecart ? `Solde enregistré. Écart de ${euros(ref.ecart, { signe: true })} avec le calcul : à expliquer.` : "Solde enregistré.", !!(ref && ref.ecart));
     }, true]]);
 }
 function vueComptes() {
   const etat = E(), auj = aujourdhui();
-  return el("div", { class: "grille" }, etat.config.banques.map((b) => {
-    const comptes = etat.config.comptes.filter((c) => c.banque === b.id);
-    const imports = etat.imports.filter((i) => i.banque === b.id).sort((a, x) => x.t.localeCompare(a.t));
-    return el("div", { class: "s6" }, panneau(b.nom, el("span", { class: "meta" }, comptes.length + (comptes.length > 1 ? " comptes" : " compte")), "",
-      el("div", { class: "pl-tuiles" }, comptes.map((c) => {
-        const s0 = M.solde(etat, c.id, auj);
-        const n = Object.values(etat.operations).filter((o) => o.compte === c.id).length;
-        const t = tuileSolde(c.nom, s0, c.id);
-        t.append(el("div", { class: "pl-boutons" },
-          el("button", { type: "button", class: "pl-lien", onclick: () => aller("operations", { compte: c.id, periode: "tout", cible: "" }) }, n + " opérations →"),
-          el("button", { type: "button", class: "pl-lien", onclick: () => saisirSolde(c.id) }, "Saisir le solde")));
-        return t;
-      })),
-      el("h3", { class: "pl-sous-titre" }, "Imports"),
-      imports.length ? el("ul", { class: "liste" }, imports.map((i) => el("li", null, el("div", { class: "pl-import" },
+  const controles = M.controles(etat);
+  const cartes = etat.config.comptes.map((c) => {
+    const sol = M.solde(etat, c.id, auj);
+    const n = Object.values(etat.operations).filter((o) => o.compte === c.id).length;
+    const ctl = controles.filter((x) => x.compte === c.id && x.ecart);
+    let justif = null;
+    if (sol && sol.reference) {
+      const r = sol.reference;
+      justif = el("dl", { class: "pl-calcul" },
+        el("dt", null, `Référence du ${dateCourte(r.date)} (${r.source === "releve" ? "relevé" : "saisie"}${r.source === "saisie" && r.inclutJour === false ? ", avant les opérations du jour" : ""})`), el("dd", null, euros(r.montant)),
+        el("dt", null, `+ ${sol.mouvementsDepuis} opération(s) depuis`), el("dd", null, euros(sol.montant - r.montant, { signe: true })),
+        el("dt", null, el("b", null, "= Solde " + (STATUTS[sol.statut] || STATUTS.inconnu)[0].toLowerCase())), el("dd", null, el("b", null, euros(sol.montant))));
+    }
+    return el("section", { class: "pl-carte pl-compte-carte" },
+      el("div", { class: "pl-compte-tete" }, el("span", { class: "pl-avatar", "aria-hidden": "true" }, initiales(c.nom)),
+        el("div", null, el("h2", null, c.nom), el("span", { class: "pl-doux" }, (etat.config.banques.find((b) => b.id === c.banque)?.nom || "") + (c.type === "epargne" ? " · épargne" : " · courant"))),
+        sol ? puceStatut(sol.statut, sol.date) : puce("Aucun relevé")),
+      el("div", { class: "pl-hero-montant petit" + (sol && sol.montant < 0 ? " negatif" : "") }, sol && sol.montant != null ? euros(sol.montant) : "—"),
+      justif,
+      sol && sol.ecart ? el("div", { class: "pl-encart corail" }, el("b", null, "Écart de " + euros(sol.ecart, { signe: true })), el("span", null, " entre ta dernière référence et le solde que PLOUTOS calculait à cette date. Il manque peut-être un relevé, ou une opération a été mal lue. Rien n'est corrigé en silence.")) : null,
+      ctl.map((x) => el("div", { class: "pl-encart corail" }, el("b", null, `Contrôle du ${dateCourte(x.du)} au ${dateCourte(x.au)} : écart de ${euros(x.ecart, { signe: true })}`),
+        el("span", null, ` (${euros(x.depart)} + ${euros(x.mouvements, { signe: true })} devrait faire ${euros(x.attendu)}, la référence dit ${euros(x.reel)}).`))),
+      el("div", { class: "pl-boutons" },
+        sol && sol.ids && sol.ids.length ? el("button", { type: "button", class: "pl-btn", onclick: () => justifier(`Opérations depuis la référence · ${c.nom}`, sol.ids, "Ajoutées au dernier solde de référence pour obtenir le solde calculé.") }, "Justifier le solde") : null,
+        el("button", { type: "button", class: "pl-btn", onclick: () => aller("operations", { compte: c.id, periode: "tout", cible: "" }) }, n + " opérations"),
+        el("button", { type: "button", class: "pl-btn principal", onclick: () => saisirSolde(c.id) }, "Saisir le solde")));
+  });
+  const imports = [...etat.imports].sort((a, x) => x.t.localeCompare(a.t));
+  const seules = (i) => Object.values(etat.operations).filter((o) => { const p = M.provenances(o); return p.length === 1 && p[0] === i.id; }).length;
+  return el("div", { class: "pl-pile" },
+    el("div", { class: "pl-grille trois" }, cartes),
+    carte("Imports", el("span", { class: "pl-doux" }, imports.length + " fichier(s)"),
+      imports.length ? el("ul", { class: "pl-imports" }, imports.map((i) => el("li", null,
         ICONE(I.fichier),
-        el("span", null, el("b", null, i.fichier || "Relevé"), el("span", { class: "secondaire" },
-          `importé le ${dateLongue(i.t.slice(0, 10))} · ${i.periode ? "du " + dateCourte(i.periode.du) + " au " + dateCourte(i.periode.au) : ""} · ${i.ajoutees} ajoutée(s), ${i.doublons} déjà connue(s)`
-          + (i.controle ? (i.controle.ok ? " · relevé juste" : " · écart de " + euros(i.controle.ecart)) : "") + ((i.ecarts || []).length ? " · écart de solde à vérifier" : ""))),
+        el("span", null, el("b", null, i.fichier || "Relevé"), el("span", { class: "pl-doux" },
+          `${etat.config.banques.find((b) => b.id === i.banque)?.nom || ""} · importé le ${dateLongue(i.t.slice(0, 10))}${i.periode ? " · du " + dateCourte(i.periode.du) + " au " + dateCourte(i.periode.au) : ""} · ${i.ajoutees} ajoutée(s), ${i.doublons} déjà connue(s)`)),
+        i.controle ? puce(i.controle.ok ? "Relevé juste" : "Écart " + euros(i.controle.ecart), i.controle.ok ? "vert" : "corail") : null,
+        i.soldeIgnore ? puce("Solde non retenu", "miel", "Le relevé ne tombe pas juste : son solde de clôture n'est pas pris comme référence") : null,
         el("button", { type: "button", class: "pl-lien danger", onclick: () => confirmer("Supprimer cet import",
-          `Les ${Object.values(etat.operations).filter((o) => o.import === i.id).length} opération(s) ajoutées par « ${i.fichier} » seront retirées, ainsi que son solde relevé. Tes règles et catégories ne bougent pas. L'action reste dans le journal.`,
-          "Supprimer l'import", async () => { await faire({ type: "supprimer-import", importId: i.id }); avis("Import supprimé."); }) }, "Supprimer")))))
-        : el("div", { class: "vide" }, "Aucun import pour l'instant."),
-      el("button", { type: "button", class: "cmd", onclick: () => aller("importer") }, "Importer un relevé " + b.nom)));
-  }));
+          `${seules(i)} opération(s) lues seulement dans « ${i.fichier} » seront retirées, ainsi que son solde relevé. Celles que d'autres imports contiennent restent, avec tes corrections. L'action reste dans le journal.`,
+          "Supprimer l'import", async () => { await faire({ type: "supprimer-import", importId: i.id }); avis("Import supprimé."); }) }, "Supprimer"))))
+        : el("p", { class: "pl-doux" }, "Aucun import pour l'instant."),
+      el("button", { type: "button", class: "pl-btn", onclick: () => aller("importer") }, ICONE(I.plus), "Importer un relevé")));
+}
+
+/* ---------------------------------------------------------------- Épargne */
+function vueEpargne() {
+  const etat = E(), auj = aujourdhui();
+  const comptes = etat.config.comptes.filter((c) => c.type === "epargne");
+  const ids = new Set(comptes.map((c) => c.id));
+  const ops = Object.values(etat.operations);
+  const opsEp = ops.filter((o) => ids.has(o.compte));
+  const mois = M.parMois(etat, ops, 12, auj);
+  const annee = M.indicateurs(etat, M.opsPeriode(etat, ops, auj.slice(0, 4) + "-01-01", auj.slice(0, 4) + "-12-31"));
+  const soldes = comptes.map((c) => ({ c, s: M.solde(etat, c.id, auj) }));
+  const total = soldes.reduce((t, x) => t + (x.s && x.s.montant || 0), 0);
+  if (!comptes.length) return carte("Épargne", null, el("p", { class: "pl-doux" }, "Aucun compte d'épargne suivi."));
+  return el("div", { class: "pl-pile" },
+    el("section", { class: "pl-hero" }, el("div", { class: "pl-hero-gauche" },
+      el("div", { class: "pl-hero-tete" }, el("span", null, "Épargne"), soldes[0] && soldes[0].s ? puceStatut(soldes[0].s.statut, soldes[0].s.date) : null),
+      el("div", { class: "pl-hero-montant" }, euros(total)),
+      el("p", { class: "pl-doux" }, comptes.map((c) => c.nom).join(", "))),
+      el("div", { class: "pl-kpis deux" },
+        el("button", { type: "button", class: "pl-kpi", onclick: () => justifier("Mis de côté · " + auj.slice(0, 4), annee.misDeCote.ids, FORMULES.misDeCote) },
+          el("span", { class: "pl-kpi-nom" }, "Mis de côté en " + auj.slice(0, 4)), el("b", { class: "pl-montant lilas" }, euros(annee.misDeCote.valeur, { signe: true })), el("span", { class: "pl-justifier" }, "Justifier ", ICONE(I.fleche))),
+        el("button", { type: "button", class: "pl-kpi", onclick: () => justifier("Intérêts · " + auj.slice(0, 4), annee.interets.ids, "Intérêts versés sur l'épargne, comptés en revenus.") },
+          el("span", { class: "pl-kpi-nom" }, "Intérêts " + auj.slice(0, 4)), el("b", { class: "pl-montant positif" }, euros(annee.interets.valeur)), el("span", { class: "pl-justifier" }, "Justifier ", ICONE(I.fleche))))),
+    carte("Mis de côté, mois par mois", el("span", { class: "pl-doux" }, "versements − retraits + intérêts"), graphiqueMois(mois, { series: [["misDeCote", "Mis de côté", "var(--pl-lilas)"]] })),
+    carte("Mouvements de l'épargne", el("button", { type: "button", class: "pl-lien", onclick: () => aller("operations", { compte: comptes[0].id, periode: "tout", cible: "" }) }, "Tout voir"),
+      el("div", { class: "pl-recentes" }, opsEp.sort((a, b) => b.dateValeur.localeCompare(a.dateValeur)).slice(0, 8).map(ligneCompacte))),
+    el("p", { class: "pl-doux pl-note" }, "Objectifs d'épargne : prévus avec les budgets (étape suivante)."));
 }
 
 /* ---------------------------------------------------------------- Importer */
@@ -855,8 +1024,9 @@ function carteImport(it) {
       el("dt", null, "Classées"), el("dd", null, String(a.classees)),
       el("dt", null, "À vérifier"), el("dd", null, el("b", { class: a.aValider ? "ambre" : "" }, String(a.aValider))),
       el("dt", null, "Virements internes"), el("dd", null, String(a.internes)),
+      a.aRapprocher ? [el("dt", null, "À rapprocher"), el("dd", null, el("b", { class: "ambre" }, String(a.aRapprocher)), " (l'autre côté manque : exclus des totaux)")] : null,
       el("dt", null, "Solde lu"), el("dd", null, (r.soldes || []).map((s0) => `${M.compte(etat, s0.compte)?.nom} : ${euros(s0.montant)} au ${dateCourte(s0.date)}`).join(" · ") || "aucun (tu pourras le saisir)"),
-      r.controle ? [el("dt", null, "Contrôle"), el("dd", { class: r.controle.ok ? "positif" : "ambre" }, r.controle.ok ? "Le relevé tombe juste (solde de départ + opérations = solde final)." : "Écart de " + euros(r.controle.ecart) + " : des lignes manquent peut-être.")] : null,
+      r.controle ? [el("dt", null, "Contrôle"), el("dd", { class: r.controle.ok ? "positif" : "ambre" }, r.controle.ok ? "Le relevé tombe juste (solde de départ + opérations = solde final)." : "Écart de " + euros(r.controle.ecart) + " : des lignes manquent peut-être. Les opérations seront importées, mais pas ce solde de clôture.")] : null,
       ign.length ? [el("dt", null, "Ignorées"), el("dd", null, ign.map(([k, n]) => `${n} ${k.toLowerCase()}`).join(", ") + " (seules les opérations terminées comptent)")] : null),
     ...(a.ecarts || []).map((e) => el("div", { class: "pl-encart rouge" }, `Écart de ${euros(e.ecart)} entre le solde calculé et le relevé pour ${M.compte(etat, e.compte)?.nom} au ${dateCourte(e.date)} : une période manque peut-être entre deux imports.`)),
     ...(r.avertissements || []).map((t) => el("div", { class: "pl-encart" }, t)));
@@ -905,11 +1075,33 @@ async function enregistrerImports() {
 
 /* ---------------------------------------------------------------- Réglages */
 function vueReglages() {
-  const sous = [["categories", "Catégories"], ["regles", "Règles"], ["donnees", "Données et coffre"]];
-  const corps = { categories: reglagesCategories, regles: reglagesRegles, donnees: reglagesDonnees }[P.sousReglages]();
+  const sous = [["categories", "Catégories"], ["regles", "Règles"], ["calculs", "Calculs"], ["donnees", "Données et coffre"]];
+  const corps = { categories: reglagesCategories, regles: reglagesRegles, calculs: reglagesCalculs, donnees: reglagesDonnees }[P.sousReglages]();
   return el("div", { class: "pl-pile" },
-    el("div", { class: "filtres" }, sous.map(([id, n]) => el("button", { type: "button", class: "filtre", "aria-pressed": P.sousReglages === id ? "true" : "false", onclick: () => { P.sousReglages = id; dessiner(); } }, n))),
+    el("div", { class: "pl-segments", role: "tablist" }, sous.map(([id, n]) => el("button", { type: "button", role: "tab", class: "pl-segment", "aria-selected": P.sousReglages === id ? "true" : "false", onclick: () => { P.sousReglages = id; dessiner(); } }, n))),
     corps);
+}
+/** Conventions de calcul (décisions D1 à D3), en clair et réglables. */
+function reglagesCalculs() {
+  const etat = E(), rg = M.reglages(etat);
+  const seuil = el("input", { type: "number", min: "1", max: "31", value: rg.seuilSalaire, "aria-label": "Jour à partir duquel le salaire compte pour le mois suivant", class: "pl-petit-champ" });
+  const decales = Object.values(etat.operations).filter((o) => M.decale(etat, o)).length;
+  return el("div", { class: "pl-pile" },
+    carte("Mois d'une opération", null,
+      el("p", null, "Une opération compte dans le mois où elle est ", el("b", null, "débitée"), " (date de valeur LCL, date de fin Revolut). La date d'achat reste affichée. C'est la seule convention qui tombe juste avec les soldes.")),
+    carte("Mois de paie", el("span", { class: "pl-doux" }, decales + " opération(s) décalée(s)"),
+      el("label", { class: "pl-ligne-reglage" }, "Un salaire versé à partir du", seuil, "compte pour le mois suivant."),
+      el("p", { class: "pl-doux" }, "Ne touche que les totaux du mois, jamais les soldes. Chaque opération peut aussi être déplacée à la main depuis son détail (« Comptée en »)."),
+      el("button", { type: "button", class: "pl-btn principal", onclick: async () => {
+        const v = Math.round(Number(seuil.value));
+        if (!(v >= 1 && v <= 31)) return avis("Choisis un jour entre 1 et 31.", true);
+        await faire({ type: "reglages", reglages: { seuilSalaire: v } }); avis("Réglage enregistré.");
+      } }, "Enregistrer")),
+    carte("Ce qui compte où", null, el("ul", { class: "pl-aide" },
+      el("li", null, el("b", null, "Dépenses : "), "dépenses moins remboursements (mutuelle, retour d'achat), dans la catégorie remboursée."),
+      el("li", null, el("b", null, "Revenus : "), "salaire, aide familiale (montrée à part), intérêts, autres rentrées."),
+      el("li", null, el("b", null, "Ni l'un ni l'autre : "), "virements entre tes comptes, virements à rapprocher, envois vers un compte à toi non suivi."),
+      el("li", null, el("b", null, "Mis de côté : "), "versements vers l'épargne moins retraits, plus intérêts."))));
 }
 function demanderTexte(titre, libelle, valeur, valider) {
   const champ = el("input", { type: "text", value: valeur || "", "aria-label": libelle });
@@ -1085,8 +1277,8 @@ async function classerIA({ silencieux = false } = {}) {
 function resume() {
   if (P.phase !== "pret" || !P.etat || !Object.keys(P.etat.operations).length) return null;
   const { du, au } = M.periode("mois", aujourdhui());
-  const t = M.totaux(P.etat, Object.values(P.etat.operations).filter((o) => o.date >= du && o.date <= au));
-  return { depenses: t.depenses, revenus: t.revenus, aValider: Object.values(P.etat.operations).filter((o) => o.aValider).length };
+  const r = M.indicateurs(P.etat, M.opsPeriode(P.etat, Object.values(P.etat.operations), du, au));
+  return { depenses: r.depenses.valeur, revenus: r.revenus.valeur, aValider: Object.values(P.etat.operations).filter((o) => o.aValider).length };
 }
 
 window.Ploutos = { vue, ouvrir, resume, _etat: () => P };
