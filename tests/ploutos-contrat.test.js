@@ -6,7 +6,7 @@ const M = require("../nexus/ploutos-moteur.js");
 
 /* Fabrique de relevés fictifs */
 const fr = (iso) => iso.split("-").reverse().join("/");
-const eur = (c) => (c / 100).toFixed(2);  // point décimal : évite que la détection du séparateur choisisse la virgule sur 2 lignes
+const eur = (c) => (c / 100).toFixed(2).replace(".", ",");  // virgule décimale, comme les vrais exports LCL
 /** LCL : lignes [date ISO, centimes, type, libellé] ; ouverture/clôture facultatives [date, centimes]. */
 function lcl(lignes, { ouverture, cloture } = {}) {
   const l = [];
@@ -14,7 +14,7 @@ function lcl(lignes, { ouverture, cloture } = {}) {
   for (const [d, m, type, lib] of lignes) l.push(`${fr(d)};${eur(m)};${type};;${lib};;`);
   if (cloture) l.push(`${fr(cloture[0])};${eur(cloture[1])};;01234 567890A`);
   // Le profil LCL veut au moins deux lignes : une ligne de solde d'ouverture seule (sans clôture) n'a aucun effet.
-  if (l.length < 2) l.unshift(`${fr(lignes[0][0])};0.00;;01234 567890A`);
+  if (l.length < 2) l.unshift(`${fr(lignes[0][0])};0,00;;01234 567890A`);
   return M.lireReleve(M.lireCsv(l.join("\n")));
 }
 /** Revolut : lignes [produit, début ISO avec heure, fin, description, centimes, frais centimes, type, solde centimes]. */

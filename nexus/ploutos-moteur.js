@@ -85,7 +85,10 @@ function detecterSeparateur(texte) {
   let meilleur = ";", score = -1;
   for (const sep of [";", ",", "\t", "|"]) {
     const n = lignes.map((l) => lireLigneCsv(l, sep).length);
-    const s = n.filter((x) => x > 1).length * 10 - new Set(n).size;
+    // Plus de colonnes = séparateur plus probable : un relevé LCL où chaque montant a une virgule décimale
+    // se découpe aussi en 2 colonnes régulières sur « , », mais en 4 à 8 sur « ; ».
+    const moyenne = n.reduce((t, x) => t + x, 0) / (n.length || 1);
+    const s = n.filter((x) => x > 1).length * 10 - new Set(n).size + (moyenne >= 3 ? 5 : 0);
     if (s > score) { score = s; meilleur = sep; }
   }
   return meilleur;
@@ -374,6 +377,7 @@ const BASE = [
   ...["amazon", "action", "gifi", "hema", "la foir fouille", "aliexpress", "temu", "ebay", "cultura", "la poste", "deutsche post"].map((m) => [m, C("shopping", "Achats divers")]),
   ...["ikea", "leroy merlin", "castorama", "conforama", "maisons du monde", "but "].map((m) => [m, C("logement", "Équipement du logement")]),
   // Logement
+  ...["loyer", "quittance"].map((m) => [m, C("logement", "Loyer"), "debit"]),
   ...["edf", "totalenergies electricite", "ekwateur", "engie"].map((m) => [m, C("logement", "Électricité")]),
   ...["veolia", "suez", "eau de"].map((m) => [m, C("logement", "Eau")]),
   // Loisirs
@@ -610,7 +614,9 @@ M.apercuImport = function (etat, releve) {
     lues: releve.operations.length, nouvelles: ajoutees.length, doublons: r.doublons || 0,
     classees: ajoutees.filter((o) => o.categorie && !o.aValider).length,
     aValider: ajoutees.filter((o) => o.aValider).length,
-    internes: ajoutees.filter((o) => o.nature === "interne").length,
+    internes: ajoutees.filter((o) => M.natureOp(copie, o) === "interne").length,
+    aRapprocher: ajoutees.filter((o) => M.natureOp(copie, o) === "rapprocher").length,
+    soldeIgnore: !!(releve.controle && releve.controle.ok === false),
     possibles: ajoutees.filter((o) => o.doublonPossible).length,
     comptes: [...new Set(releve.operations.map((o) => o.compte))],
     ecarts: r.ecarts || [], operations: ajoutees,
