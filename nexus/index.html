@@ -261,17 +261,18 @@ button.case:hover::after { background: var(--m); }
 .sous-titre { margin: 0 0 4px; font: 700 11px/1.2 var(--titre); letter-spacing: .22em; color: var(--doux); text-transform: uppercase; }
 .rangee.faite:not(.tache) { opacity: .85; }
 .fin-mail { display: flex; align-items: center; gap: 10px; }
-.actions-mail { display: flex; gap: 4px; opacity: 0; transition: opacity .15s; }
-.rangee:hover .actions-mail, .rangee.choisie .actions-mail, .rangee:focus-within .actions-mail { opacity: 1; }
+.actions-mail { display: none; gap: 4px; }
+.rangee:hover .actions-mail, .rangee.choisie .actions-mail, .rangee:focus-within .actions-mail { display: flex; }
 .texte-action { font: 600 9px/1 var(--mono); letter-spacing: .02em; }
 .edition-tache { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 6px; grid-column: 2 / 4; }
 .edition-tache input[type="text"] { grid-column: 1 / -1; width: 100%; }
+.form-brouillon > span:empty { display: block; }
 .edition-tache input { min-width: 0; padding: 7px 9px; border: 1px solid var(--m); background: var(--surface-cmd); color: var(--texte); font: 500 14px/1.2 var(--corps); }
 .edition-tache .cmd { padding: 6px 9px; }
 .edition-tache + span { display: none; }
 .avis .annuler { margin-left: 14px; padding: 5px 8px; gap: 8px; display: inline-flex; align-items: center; }
 .avis .annuler kbd { font-size: 9px; }
-@media (hover: none) { .actions-mail { opacity: 1; } }
+@media (hover: none) { .actions-mail { display: flex; } }
 .action-mail { width: 26px; height: 26px; padding: 0; display: grid; place-items: center; cursor: pointer;
   background: none; border: 1px solid var(--ligne-forte); color: var(--doux); }
 .action-mail:hover, .action-mail:focus-visible { border-color: var(--m); color: var(--m); }
@@ -669,6 +670,7 @@ kbd {
         <dt><kbd>P</kbd></dt><dd>Repousser la tâche choisie d'un jour (<kbd>Maj</kbd>+<kbd>P</kbd> : d'une semaine)</dd>
         <dt><kbd>M</kbd></dt><dd>Modifier le titre ou l'échéance de la tâche choisie</dd>
         <dt><kbd>Ctrl</kbd><kbd>Z</kbd></dt><dd>Annuler la dernière action (quelques secondes après)</dd>
+        <dt><kbd>B</kbd></dt><dd>Brouillon de réponse au mail choisi, rédigé dans Gmail (tu relis et tu envoies)</dd>
         <dt><kbd>A</kbd></dt><dd>Faire une tâche du mail choisi (libellé « À traiter » dans Gmail)</dd>
         <dt><kbd>U</kbd></dt><dd>Marquer le mail choisi comme lu</dd>
         <dt><kbd>E</kbd></dt><dd>Archiver le mail choisi (il quitte la boîte de réception)</dd>
@@ -1242,6 +1244,7 @@ function appliquerAjoutees(d) {
    l'action est retenue sur l'appareil : le mail archivé disparaît, le mail lu perd son losange plein,
    la tâche apparaît tout de suite dans « À traiter ». */
 const ACTIONS_MAIL = [
+  { action: "brouillon", cle: "B", titre: "Brouillon de réponse dans Gmail", icone: "M9 8 4 12l5 4M4 12h10a6 6 0 0 1 6 6" },
   { action: "tache", cle: "A", titre: "En faire une tâche", icone: "M5 12l4 4L19 6" },
   { action: "lu", cle: "U", titre: "Marquer comme lu", icone: "M3 7l9 6 9-6M3 7v10h18V7" },
   { action: "archiver", cle: "E", titre: "Archiver", icone: "M4 8h16M6 8v11h12V8M10 12h4M3 4h18v4H3z" },
@@ -1257,11 +1260,39 @@ function appliquerMails(d) {
   h.non_lus = h.mails.filter((m) => m.non_lu).length;
   return d;
 }
+/* Brouillon de réponse (touche B) : une consigne facultative, puis le workflow « Mail » fait rédiger la
+   réponse par Haiku et la dépose en brouillon dans le fil Gmail. Une notification prévient quand elle est prête. */
+let brouillonPour = null;
+function ouvrirBrouillon(m) {
+  brouillonPour = m.id; rendre();
+  const champ = document.querySelector(".form-brouillon input"); if (champ) champ.focus();
+}
+function formBrouillon(m) {
+  const consigne = el("input", { type: "text", name: "consigne", maxlength: "500", autocomplete: "off",
+    placeholder: "Ce que tu veux répondre (facultatif) : « oui pour jeudi », « décline poliment »…", "aria-label": "Consigne pour le brouillon" });
+  const fermer = () => { brouillonPour = null; rendre(); };
+  const f = el("form", { class: "edition-tache form-brouillon", onsubmit: async (ev) => {
+      ev.preventDefault();
+      f.querySelectorAll("input, button").forEach((x) => { x.disabled = true; });
+      try {
+        await lancerTache({ email_id: m.id, action: "brouillon", titre: consigne.value.replace(/\s+/g, " ").trim() }, "mail.yml");
+        brouillonPour = null; rendre();
+        avis("Brouillon en préparation pour " + m.de + " : il sera dans Gmail d'ici une minute.");
+      } catch (e) {
+        f.querySelectorAll("input, button").forEach((x) => { x.disabled = false; });
+        avis(e instanceof TypeError ? "Pas de connexion. Réessaie." : e.message, true);
+      }
+    }, onkeydown: (ev) => { if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); fermer(); } } },
+    el("span", { class: "secondaire", style: "grid-column:1/-1;margin:0" }, "Réponse à " + m.de + " · " + m.objet),
+    consigne, el("span"), el("button", { class: "cmd", type: "submit" }, "RÉDIGER"), el("button", { class: "cmd", type: "button", onclick: fermer }, "ANNULER"));
+  return el("div", { class: "rangee mail", "data-mail": m.id }, el("span", { class: "losange plein" }), f, el("span"));
+}
 function ligneMail(m, libelles) {
+  if (brouillonPour && brouillonPour === m.id) return formBrouillon(m);
   const suivi = m.id && Object.values(lireAjoutees()).some((t) => t.mail === m.id);
   const boutons = m.id ? ACTIONS_MAIL.filter((a) => !(a.action === "lu" && !m.non_lu) && !(a.action === "tache" && suivi)).map((a) =>
     el("button", { class: "action-mail", type: "button", "data-action": a.action, title: a.titre + " (" + a.cle + ")", "aria-label": a.titre + " : " + m.objet,
-      onclick: (ev) => { ev.preventDefault(); agirMail(m, a.action, ev.currentTarget); } },
+      onclick: (ev) => { ev.preventDefault(); a.action === "brouillon" ? ouvrirBrouillon(m) : agirMail(m, a.action, ev.currentTarget); } },
       s("svg", { viewBox: "0 0 24 24", "aria-hidden": "true" }, s("path", { d: a.icone })))) : [];
   return el("div", { class: "rangee mail", "data-mail": m.id || "" },
     el("span", { class: "losange" + (m.non_lu ? " plein" : "") }),
@@ -1466,7 +1497,7 @@ function vueHermes(d) {
       el("p", { class: "secondaire", style: "margin:12px 0 0" }, "Coche une tâche quand elle est faite : celles qui viennent d'un mail se ferment aussi dans Gmail."))),
     el("div", { class: "s4" }, panneau("Boîte de réception", el("span", { class: "meta" }, h.non_lus + " NON LUS"), "",
       liste(h.mails, "Boîte vide sur 3 jours.", (m) => ligneMail(m, true)),
-      el("p", { class: "secondaire", style: "margin:12px 0 0" }, "Sur une ligne choisie : A en fait une tâche, U la marque comme lue, E l'archive dans Gmail."))),
+      el("p", { class: "secondaire", style: "margin:12px 0 0" }, "Sur une ligne choisie : B prépare un brouillon de réponse, A en fait une tâche, U la marque comme lue, E l'archive."))),
     el("div", { class: "s3 pile" }, panneau("Répartition", null, "", donut, legende),
       panneau("Briefing", el("span", { class: "meta" }, d.briefing ? d.briefing.titre.toUpperCase() : ""), "",
         liste(d.briefing ? d.briefing.mails.filter((m) => m.genre !== "securite") : [], "Rien d'important.", (m) => el("div", { class: "rangee" },
@@ -2300,6 +2331,7 @@ function preparerClavier() {
     else if (listes && (k === "x" || k === "X")) cocherChoisie();
     else if (listes && (k === "p" || k === "P")) { const t = tacheChoisie(); t ? repousser(t, ev.shiftKey ? 7 : 1) : avis("Choisis d'abord une tâche avec J ou K.", true); }
     else if (listes && (k === "m" || k === "M")) { const t = tacheChoisie(); t ? ouvrirEdition(t) : avis("Choisis d'abord une tâche avec J ou K.", true); }
+    else if (listes && (k === "b" || k === "B")) agirMailChoisi("brouillon");
     else if (listes && (k === "a" || k === "A")) agirMailChoisi("tache");
     else if (listes && (k === "u" || k === "U")) agirMailChoisi("lu");
     else if (listes && (k === "e" || k === "E")) agirMailChoisi("archiver");
