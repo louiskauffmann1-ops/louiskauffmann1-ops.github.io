@@ -593,7 +593,54 @@ kbd {
   .jarvis { z-index: 35; width: 100vw; border-left: 0; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
   .j-micro { width: 112px; height: 112px; }
   .avis { bottom: calc(150px + env(safe-area-inset-bottom, 0px)); }
+
+  /* Version iPhone : barre d'onglets opaque et compacte, en-tête sous la barre d'état, gros doigts. */
+  .rail { background: color-mix(in srgb, var(--fond) 88%, transparent); -webkit-backdrop-filter: blur(14px) saturate(1.4); backdrop-filter: blur(14px) saturate(1.4); z-index: 30; }
+  .onglet .anneau { width: 32px; height: 32px; }
+  .onglet span.nom { font-size: 9.5px; letter-spacing: .12em; }
+  .bandeau { top: 0; padding-top: calc(env(safe-area-inset-top, 0px) + 8px); }
+  .tete-module { margin-top: 4px; }
+  .tete-module h1 { font-size: 34px; }
+  .tete-module .epithete { display: none; }
+  .accueil .col-reacteur { order: 0; }
+  .reacteur { max-width: 200px; }
+  .actions-mail, .rangee:hover .actions-mail, .rangee.choisie .actions-mail { display: none; }
+  .rangee .plus-actions { display: grid; }
+  .rangee { min-height: 52px; }
+  .rangee.tache, .rangee.mail { grid-template-columns: auto minmax(0, 1fr) auto auto; touch-action: pan-y; transition: transform .18s ease-out; background: var(--fond-rangee, transparent); }
+  .rangee.tache .edition-tache, .rangee.mail .edition-mail, .rangee.mail .form-brouillon { grid-column: 2 / 5; }
+  .liste > li { position: relative; }
+  button.fab { display: grid; }
+  .avis .annuler kbd { display: none; }
+  p.aide-gestes { display: block; }
 }
+.plus-actions, .fab, .aide-gestes { display: none; }
+.plus-actions { place-items: center; width: 34px; height: 34px; margin-right: -6px; background: none; border: 0; color: var(--doux); font: 700 18px/1 var(--corps); cursor: pointer; }
+.liste > li[data-geste] { background: color-mix(in srgb, var(--geste, var(--m)) 22%, transparent); }
+.liste > li[data-geste] > .rangee { --fond-rangee: var(--fond); }
+.liste > li[data-geste]::before { content: attr(data-libelle); position: absolute; top: 50%; transform: translateY(-50%); font: 700 11px/1 var(--titre); letter-spacing: .2em; color: var(--geste, var(--m)); }
+.liste > li[data-geste="droite"]::before { left: 14px; }
+.liste > li[data-geste="gauche"]::before { right: 14px; }
+.liste > li.geste-pret::before { color: var(--texte); }
+.fab {
+  position: fixed; z-index: 31; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+  width: 56px; height: 56px; place-items: center; border-radius: 50%; border: 1px solid var(--nexus); cursor: pointer;
+  background: color-mix(in srgb, var(--nexus) 22%, var(--fond)); color: var(--nexus); box-shadow: 0 0 22px color-mix(in srgb, var(--nexus) 45%, transparent);
+}
+.fab svg { width: 26px; height: 26px; stroke: currentColor; stroke-width: 2; fill: none; }
+.feuille-voile { position: fixed; inset: 0; z-index: 70; background: var(--voile); display: grid; align-items: end; animation: entrer .15s ease-out; }
+.feuille {
+  display: grid; gap: 2px; padding: 10px 12px calc(14px + env(safe-area-inset-bottom, 0px)); background: var(--surface-haute);
+  border-top: 1px solid var(--ligne-forte); max-height: 80vh; overflow-y: auto;
+}
+.feuille .titre-feuille { padding: 8px 6px 10px; font-size: 13px; color: var(--doux); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.feuille button, .feuille a { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 50px; padding: 0 10px; background: none; border: 0;
+  border-top: 1px solid var(--ligne); color: var(--texte); font: 500 16px/1.2 var(--corps); text-align: left; text-decoration: none; cursor: pointer; }
+.feuille button.danger { color: var(--alerte); }
+.feuille .annuler-feuille { justify-content: center; margin-top: 6px; border: 1px solid var(--ligne-forte); color: var(--doux); }
+.tirer { position: fixed; z-index: 40; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 8px); transform: translate(-50%, -60px); padding: 6px 12px;
+  border: 1px solid var(--nexus); background: var(--surface-haute); color: var(--nexus); font: 600 11px/1 var(--titre); letter-spacing: .16em; transition: transform .1s; pointer-events: none; }
+.aide-gestes { margin: 10px 0 0; font-size: 12px; color: var(--doux); }
 @media (max-width: 420px) {
   .accueil .col-jauges .jauges { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
@@ -617,6 +664,8 @@ kbd {
 </section>
 
 <div class="avis" id="avis" role="status" hidden></div>
+<button class="fab" id="fab" type="button" aria-label="Ajouter une tâche ou un événement"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+<div class="tirer" id="tirer" aria-hidden="true">RELÂCHE POUR ACTUALISER</div>
 <div class="demarrage" id="demarrage" hidden><pre id="journal-demarrage"></pre></div>
 
 <div class="appli" id="appli" hidden>
@@ -1168,12 +1217,13 @@ function ligneTache(t) {
   const actions = t.id ? ACTIONS_TACHE.map((a) => el("button", { class: "action-mail", type: "button", "data-action": a.action,
       title: a.titre + " (" + a.cle + ")", "aria-label": a.titre + " : " + t.titre, onclick: (ev) => { ev.preventDefault(); a.faire(t); } },
     a.icone ? s("svg", { viewBox: "0 0 24 24", "aria-hidden": "true" }, s("path", { d: a.icone })) : el("span", { class: "texte-action" }, a.texte))) : [];
+  const plus = t.id ? el("button", { class: "plus-actions", type: "button", "aria-label": "Actions : " + t.titre, onclick: () => feuilleTache(t) }, "⋯") : null;
   return el("div", { class: "rangee tache", "data-tache": t.id || "" },
     el("button", { class: "case", type: "button", title: "Marquer comme faite", "aria-label": "Marquer comme faite : " + t.titre, onclick: (ev) => cocher(t, ev.currentTarget) }),
     (t.lien ? (...x) => lien(t.lien, ...x) : (...x) => el("span", ...x))({ class: "principal" }, t.titre, el("span", { class: "secondaire" }, (t.quand ? t.quand.toLowerCase() : "sans échéance") + (t.manuelle ? " · ajoutée à la main" : ""))),
     el("span", { class: "fin-mail" }, el("span", { class: "actions-mail" }, actions),
       el("span", { class: "echeance" }, el("span", { class: "temps" }, restant == null ? "—" : t.retard ? "RETARD" : restant === 0 ? "JOUR J" : "J-" + restant),
-        el("span", { class: "barre " + teinte }, el("i", { style: `width:${plein}%` })))));
+        el("span", { class: "barre " + teinte }, el("i", { style: `width:${plein}%` })))), plus);
 }
 /* Cocher une tâche : la console lance le workflow « Tâche faite » du dépôt olympe, qui retire le
    libellé « À traiter » dans Gmail et ferme la tâche. En attendant la mise à jour des données
@@ -1322,7 +1372,8 @@ function ligneMail(m, libelles) {
     el("span", { class: "losange" + (m.non_lu ? " plein" : "") }),
     lien(m.lien, { class: "principal" }, el("strong", null, m.de), el("span", { class: "secondaire" }, m.objet),
       libelles ? m.libelles.map((l) => el("span", { class: "etiquette" }, l)) : null),
-    el("span", { class: "fin-mail" }, el("span", { class: "actions-mail" }, boutons), el("span", { class: "temps" }, quand(m.date))));
+    el("span", { class: "fin-mail" }, el("span", { class: "actions-mail" }, boutons), el("span", { class: "temps" }, quand(m.date))),
+    m.id ? el("button", { class: "plus-actions", type: "button", "aria-label": "Actions : " + m.objet, onclick: () => feuilleMail(m) }, "⋯") : null);
 }
 async function agirMail(m, action, bouton) {
   if (bouton && bouton.disabled) return;
@@ -1518,7 +1569,8 @@ function vueHermes(d) {
     el("div", { class: "s5" }, panneau("À traiter", el("span", { class: "compte" }, String(h.taches.length)), "",
       formNouvelleTache(),
       liste(h.taches, "Rien à traiter. Ajoute une tâche ci-dessus, ou elles arriveront avec le briefing du matin.", ligneTache),
-      el("p", { class: "secondaire", style: "margin:12px 0 0" }, "Coche une tâche quand elle est faite : celles qui viennent d'un mail se ferment aussi dans Gmail."))),
+      el("p", { class: "secondaire", style: "margin:12px 0 0" }, "Coche une tâche quand elle est faite : celles qui viennent d'un mail se ferment aussi dans Gmail."),
+      el("p", { class: "aide-gestes" }, "Sur iPhone : balaie une tâche vers la droite pour la cocher, vers la gauche pour la repousser d'un jour. Sur un mail : droite archive, gauche en fait une tâche. Le bouton ⋯ montre toutes les actions."))),
     el("div", { class: "s4" }, panneau("Boîte de réception", el("span", { class: "meta" }, h.non_lus + " NON LUS"), "",
       liste(h.mails, "Boîte vide sur 3 jours.", (m) => ligneMail(m, true)),
       el("p", { class: "secondaire", style: "margin:12px 0 0" }, "Sur une ligne choisie : B prépare un brouillon de réponse, A en fait une tâche, U la marque comme lue, E l'archive."))),
@@ -2414,6 +2466,114 @@ function ouvrirSante() {
   $("fenetre-sante").hidden = false; $("sante-fermer").focus();
 }
 function fermerSante() { $("fenetre-sante").hidden = true; }
+/* Version iPhone : feuille d'actions (bouton ⋯), gestes de balayage sur les lignes (droite : fait ou
+   archiver ; gauche : +1 jour ou en faire une tâche), bouton + flottant, tirer vers le bas pour actualiser. */
+function feuille(titre, actions) {
+  const fermer = () => voile.remove();
+  const voile = el("div", { class: "feuille-voile", onclick: (ev) => { if (ev.target === voile) fermer(); } },
+    el("div", { class: "feuille", role: "dialog", "aria-modal": "true", "aria-label": titre },
+      el("div", { class: "titre-feuille" }, titre),
+      actions.filter(Boolean).map((a) => a.lien ? lien(a.lien, { onclick: fermer }, a.texte)
+        : el("button", { type: "button", class: a.danger ? "danger" : "", onclick: () => { fermer(); a.faire(); } }, a.texte)),
+      el("button", { class: "annuler-feuille", type: "button", onclick: fermer }, "Fermer")));
+  document.body.append(voile);
+}
+function feuilleTache(t) {
+  feuille(t.titre, [
+    { texte: "✓  Fait", faire: () => { const b = document.querySelector(`.rangee.tache[data-tache="${t.id}"] button.case`); if (b) b.click(); } },
+    { texte: "+1 jour", faire: () => repousser(t, 1) },
+    { texte: "+1 semaine", faire: () => repousser(t, 7) },
+    { texte: "Modifier le titre ou l'échéance", faire: () => ouvrirEdition(t) },
+    { texte: "Planifier aujourd'hui (CHRONOS)", faire: () => { tachePlanifiee = t.id; aller("chronos"); setTimeout(() => document.querySelector(".grille-plan")?.scrollIntoView({ block: "center" }), 60); } },
+    t.lien ? { texte: "Ouvrir le mail", lien: t.lien } : null,
+  ]);
+}
+function feuilleMail(m) {
+  const suivi = Object.values(lireAjoutees()).some((t) => t.mail === m.id);
+  feuille(m.de + " · " + m.objet, [
+    { texte: "Ouvrir dans Gmail", lien: m.lien },
+    { texte: "Brouillon de réponse", faire: () => ouvrirBrouillon(m) },
+    { texte: "Ajouter à l'agenda", faire: () => ouvrirAgendaMail(m) },
+    suivi ? null : { texte: "En faire une tâche", faire: () => agirMail(m, "tache") },
+    m.non_lu ? { texte: "Marquer comme lu", faire: () => agirMail(m, "lu") } : null,
+    { texte: "Archiver", faire: () => agirMail(m, "archiver"), danger: true },
+  ]);
+}
+function gesteSur(r, sens) {
+  if (r.dataset.tache) {
+    const t = donnees.hermes.taches.find((x) => x.id === r.dataset.tache);
+    if (!t) return;
+    if (sens === "droite") r.querySelector("button.case")?.click(); else repousser(t, 1);
+  } else if (r.dataset.mail) {
+    const m = donnees.hermes.mails.find((x) => x.id === r.dataset.mail);
+    if (!m) return;
+    if (sens === "droite") agirMail(m, "archiver");
+    else if (!Object.values(lireAjoutees()).some((t) => t.mail === m.id)) agirMail(m, "tache");
+    else avis("Ce mail est déjà une tâche.", true);
+  }
+}
+function preparerTactile() {
+  const vue = $("vue");
+  let r = null, x0 = 0, y0 = 0, dx = 0, glisse = false, bloquerClic = 0;
+  const libelles = (ligne, sens) => ligne.dataset.tache ? (sens === "droite" ? ["FAIT", "var(--ploutos)"] : ["+1 JOUR", "var(--ambre)"])
+    : (sens === "droite" ? ["ARCHIVER", "var(--alerte)"] : ["TÂCHE", "var(--hermes)"]);
+  const remettre = () => {
+    if (!r) return;
+    r.style.transform = ""; const li = r.parentElement;
+    if (li) { delete li.dataset.geste; li.classList.remove("geste-pret"); li.style.removeProperty("--geste"); }
+  };
+  vue.addEventListener("touchstart", (ev) => {
+    const ligne = ev.target.closest(".rangee.tache[data-tache], .rangee.mail[data-mail]");
+    if (!ligne || !ligne.dataset.tache && !ligne.dataset.mail || ev.touches.length > 1 || ev.target.closest("input, select, form, .plus-actions")) { r = null; return; }
+    if (!matchMedia("(max-width: 760px)").matches) { r = null; return; }
+    r = ligne; x0 = ev.touches[0].clientX; y0 = ev.touches[0].clientY; dx = 0; glisse = false;
+  }, { passive: true });
+  vue.addEventListener("touchmove", (ev) => {
+    if (!r) return;
+    const t = ev.touches[0], ddx = t.clientX - x0, ddy = t.clientY - y0;
+    if (!glisse) {
+      if (Math.abs(ddy) > 10 && Math.abs(ddy) > Math.abs(ddx)) { r = null; return; }
+      if (Math.abs(ddx) < 12) return;
+      glisse = true;
+    }
+    dx = Math.max(-150, Math.min(150, ddx));
+    const sens = dx > 0 ? "droite" : "gauche", [texte, teinte] = libelles(r, sens), li = r.parentElement;
+    r.style.transform = `translateX(${dx}px)`;
+    li.dataset.geste = sens; li.dataset.libelle = texte; li.style.setProperty("--geste", teinte);
+    li.classList.toggle("geste-pret", Math.abs(dx) > 96);
+  }, { passive: true });
+  const fin = () => {
+    if (!r) return;
+    const ligne = r, fait = glisse && Math.abs(dx) > 96, sens = dx > 0 ? "droite" : "gauche";
+    if (glisse) bloquerClic = Date.now();
+    remettre(); r = null; glisse = false;
+    if (fait) gesteSur(ligne, sens);
+  };
+  vue.addEventListener("touchend", fin); vue.addEventListener("touchcancel", () => { remettre(); r = null; });
+  // Un balayage ne doit pas ouvrir le lien de la ligne.
+  vue.addEventListener("click", (ev) => { if (ev.isTrusted && Date.now() - bloquerClic < 400 && ev.target.closest(".rangee")) { ev.preventDefault(); ev.stopPropagation(); } }, true);
+
+  // Tirer vers le bas, en haut de la page, pour actualiser (l'appli installée n'a pas ce geste d'elle-même).
+  let yTirer = null, tire = 0;
+  addEventListener("touchstart", (ev) => { yTirer = scrollY <= 0 && !ev.target.closest(".feuille, .fenetre, .rangee") ? ev.touches[0].clientY : null; tire = 0; }, { passive: true });
+  addEventListener("touchmove", (ev) => {
+    if (yTirer == null) return;
+    tire = Math.max(0, ev.touches[0].clientY - yTirer);
+    $("tirer").style.transform = `translate(-50%, ${Math.min(tire, 110) - 60}px)`;
+    $("tirer").textContent = tire > 90 ? "RELÂCHE POUR ACTUALISER" : "TIRE POUR ACTUALISER";
+  }, { passive: true });
+  addEventListener("touchend", () => {
+    if (yTirer == null) return;
+    $("tirer").style.transform = "";
+    if (tire > 90) $("rafraichir").click();
+    yTirer = null;
+  });
+  $("fab").onclick = () => feuille("Ajouter", [
+    { texte: "Nouvelle tâche", faire: nouvelleTache },
+    { texte: "Nouvel événement", faire: nouvelEvenement },
+    { texte: "Planifier la journée", faire: () => { aller("chronos"); setTimeout(() => document.querySelector(".grille-plan")?.scrollIntoView({ block: "center" }), 60); } },
+  ]);
+}
 function ouvrirAide() { $("aide-clavier").hidden = false; $("aide-fermer").focus(); }
 function fermerAide() { $("aide-clavier").hidden = true; }
 
@@ -2508,7 +2668,7 @@ async function ouvrir(d) {
   $("verrou").hidden = true;
   $("appli").hidden = false;
   aller((location.hash || "#nexus").slice(1), true);
-  if (!ouvrir.pret) { ouvrir.pret = true; preparerClavier(); if (!JARVIS_EN_PAUSE) preparerJarvis(); }
+  if (!ouvrir.pret) { ouvrir.pret = true; preparerClavier(); preparerTactile(); if (!JARVIS_EN_PAUSE) preparerJarvis(); }
   await sequenceDemarrage();
 }
 async function demarrer() {
