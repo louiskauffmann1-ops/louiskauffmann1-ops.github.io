@@ -250,6 +250,15 @@ button.case:hover::after { background: var(--m); }
 .rangee.faite .principal { text-decoration: line-through; color: var(--doux); }
 .rangee.faite { opacity: .7; transition: opacity .6s; }
 .rangee a.principal:hover { color: var(--m); }
+.fin-mail { display: flex; align-items: center; gap: 10px; }
+.actions-mail { display: flex; gap: 4px; opacity: 0; transition: opacity .15s; }
+.rangee.mail:hover .actions-mail, .rangee.mail.choisie .actions-mail, .rangee.mail:focus-within .actions-mail { opacity: 1; }
+@media (hover: none) { .actions-mail { opacity: 1; } }
+.action-mail { width: 26px; height: 26px; padding: 0; display: grid; place-items: center; cursor: pointer;
+  background: none; border: 1px solid var(--ligne-forte); color: var(--doux); }
+.action-mail:hover, .action-mail:focus-visible { border-color: var(--m); color: var(--m); }
+.action-mail:disabled { opacity: .4; cursor: default; }
+.action-mail svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .avis {
   position: fixed; z-index: 45; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
   max-width: min(520px, calc(100vw - 32px)); padding: 10px 16px; border: 1px solid var(--ploutos);
@@ -622,6 +631,9 @@ kbd {
       <dl>
         <dt><kbd>J</kbd> <kbd>K</kbd></dt><dd>Ligne suivante, ligne précédente</dd>
         <dt><kbd>X</kbd></dt><dd>Cocher la tâche choisie (elle se ferme aussi dans Gmail)</dd>
+        <dt><kbd>A</kbd></dt><dd>Faire une tâche du mail choisi (libellé « À traiter » dans Gmail)</dd>
+        <dt><kbd>U</kbd></dt><dd>Marquer le mail choisi comme lu</dd>
+        <dt><kbd>E</kbd></dt><dd>Archiver le mail choisi (il quitte la boîte de réception)</dd>
         <dt><kbd>Entrée</kbd></dt><dd>Ouvrir le mail ou le lien de la ligne</dd>
         <dt><kbd>Échap</kbd></dt><dd>Quitter la sélection</dd>
       </dl>
@@ -997,10 +1009,7 @@ function vueNexus(d) {
       h.taches.length > 6 ? lienModule("hermes", "Les " + h.taches.length + " tâches") : lienModule("hermes", "HERMÈS")));
   const mailsTuile = el("div", { class: "s6", style: "--m:var(--hermes)" },
     panneau("Derniers mails", el("span", { class: "meta" }, h.non_lus + " NON LUS"), "",
-      liste(h.mails.slice(0, 5), "Boîte vide sur 3 jours.", (m) => lien(m.lien, { class: "rangee" },
-        el("span", { class: "losange" + (m.non_lu ? " plein" : "") }),
-        el("span", { class: "principal" }, el("strong", null, m.de), el("span", { class: "secondaire" }, m.objet)),
-        el("span", { class: "temps" }, quand(m.date)))),
+      liste(h.mails.slice(0, 5), "Boîte vide sur 3 jours.", (m) => ligneMail(m, false)),
       lienModule("hermes", "Boîte de réception")));
   const budgetTuile = el("div", { class: "s6", style: "--m:var(--ploutos)" }, tuileBudget(d));
 
@@ -1074,6 +1083,7 @@ function lireFaites() { try { return JSON.parse(localStorage.getItem("nexus-fait
 function garderFaites(f) { try { localStorage.setItem("nexus-faites", JSON.stringify(f)); } catch {} }
 function appliquerFaites(d) {
   appliquerAjoutees(d);
+  appliquerMails(d);
   const faites = lireFaites(), ids = new Set(d.hermes.taches.map((t) => t.id));
   for (const id of Object.keys(faites)) if (!ids.has(id) || Date.now() - faites[id] > 864e5) delete faites[id];
   garderFaites(faites);
@@ -1095,11 +1105,75 @@ function appliquerAjoutees(d) {
   const ajoutees = lireAjoutees(), ids = new Set(d.hermes.taches.map((t) => t.id));
   for (const [id, t] of Object.entries(ajoutees)) {
     if (ids.has(id) || Date.now() - t.cree > 864e5) { delete ajoutees[id]; continue; }
-    d.hermes.taches.push({ id, titre: t.titre, echeance: t.echeance || null, quand: quandLocal(t.echeance), retard: !!t.echeance && joursEntre(t.echeance) < 0, lien: null, manuelle: true, attente: true });
+    d.hermes.taches.push({ id, titre: t.titre, echeance: t.echeance || null, quand: quandLocal(t.echeance), retard: !!t.echeance && joursEntre(t.echeance) < 0, lien: t.lien || null, manuelle: !t.lien, attente: true });
   }
   garderAjoutees(ajoutees);
   d.hermes.taches.sort((a, b) => (!a.echeance - !b.echeance) || (a.echeance || "").localeCompare(b.echeance || ""));
   return d;
+}
+/* Agir sur un mail : A en fait une tâche, U le marque comme lu, E l'archive. La console lance le
+   workflow « Mail » du dépôt olympe, qui agit dans Gmail. En attendant la mise à jour des données,
+   l'action est retenue sur l'appareil : le mail archivé disparaît, le mail lu perd son losange plein,
+   la tâche apparaît tout de suite dans « À traiter ». */
+const ACTIONS_MAIL = [
+  { action: "tache", cle: "A", titre: "En faire une tâche", icone: "M5 12l4 4L19 6" },
+  { action: "lu", cle: "U", titre: "Marquer comme lu", icone: "M3 7l9 6 9-6M3 7v10h18V7" },
+  { action: "archiver", cle: "E", titre: "Archiver", icone: "M4 8h16M6 8v11h12V8M10 12h4M3 4h18v4H3z" },
+];
+function lireMails() { try { return JSON.parse(localStorage.getItem("nexus-mails") || "{}"); } catch { return {}; } }
+function garderMails(m) { try { localStorage.setItem("nexus-mails", JSON.stringify(m)); } catch {} }
+function appliquerMails(d) {
+  const faits = lireMails(), h = d.hermes, ids = new Set(h.mails.map((m) => m.id));
+  for (const id of Object.keys(faits)) if (!ids.has(id) || Date.now() - faits[id].t > 864e5) delete faits[id];
+  garderMails(faits);
+  h.mails = h.mails.filter((m) => !(faits[m.id] && faits[m.id].archiver));
+  for (const m of h.mails) if (faits[m.id] && (faits[m.id].lu || faits[m.id].archiver) && m.non_lu) m.non_lu = false;
+  h.non_lus = h.mails.filter((m) => m.non_lu).length;
+  return d;
+}
+function ligneMail(m, libelles) {
+  const suivi = m.id && Object.values(lireAjoutees()).some((t) => t.mail === m.id);
+  const boutons = m.id ? ACTIONS_MAIL.filter((a) => !(a.action === "lu" && !m.non_lu) && !(a.action === "tache" && suivi)).map((a) =>
+    el("button", { class: "action-mail", type: "button", "data-action": a.action, title: a.titre + " (" + a.cle + ")", "aria-label": a.titre + " : " + m.objet,
+      onclick: (ev) => { ev.preventDefault(); agirMail(m, a.action, ev.currentTarget); } },
+      s("svg", { viewBox: "0 0 24 24", "aria-hidden": "true" }, s("path", { d: a.icone })))) : [];
+  return el("div", { class: "rangee mail", "data-mail": m.id || "" },
+    el("span", { class: "losange" + (m.non_lu ? " plein" : "") }),
+    lien(m.lien, { class: "principal" }, el("strong", null, m.de), el("span", { class: "secondaire" }, m.objet),
+      libelles ? m.libelles.map((l) => el("span", { class: "etiquette" }, l)) : null),
+    el("span", { class: "fin-mail" }, el("span", { class: "actions-mail" }, boutons), el("span", { class: "temps" }, quand(m.date))));
+}
+async function agirMail(m, action, bouton) {
+  if (bouton && bouton.disabled) return;
+  if (!m.id) return avis("Données d'avant la mise à jour : touche ACTUALISER, puis réessaie.", true);
+  if (bouton) bouton.disabled = true;
+  try {
+    await lancerTache({ email_id: m.id, action, titre: action === "tache" ? (m.objet || "").slice(0, 200) : "" }, "mail.yml");
+  } catch (e) {
+    if (bouton) bouton.disabled = false;
+    return avis(e instanceof TypeError ? "Pas de connexion. Réessaie." : e.message, true);
+  }
+  if (action === "tache") {
+    const ajoutees = lireAjoutees();
+    ajoutees[m.id] = { titre: m.objet || "(sans objet)", echeance: "", cree: Date.now(), lien: m.lien, mail: m.id };
+    garderAjoutees(ajoutees);
+    avis("Tâche créée : " + (m.objet || m.de));
+  } else {
+    const faits = lireMails(); faits[m.id] = { ...(faits[m.id] || {}), [action]: true, t: Date.now() }; garderMails(faits);
+    avis(action === "archiver" ? "Mail archivé : " + m.de : "Mail marqué comme lu : " + m.de);
+  }
+  const garde = selection.index;
+  appliquerFaites(donnees); rendre();
+  if (garde < 0) return;
+  // On reste sur le même mail (ou sur le suivant s'il vient d'être archivé), même si une tâche s'est ajoutée au-dessus.
+  const ici = lignes().findIndex((r) => r.dataset.mail === m.id);
+  choisirLigne(ici >= 0 ? ici : garde, false);
+}
+function agirMailChoisi(action) {
+  const r = ligneChoisie(), b = r && r.querySelector(`button.action-mail[data-action="${action}"]`);
+  if (b) b.click();
+  else avis(!r ? "Choisis d'abord un mail avec J ou K." : !r.classList.contains("mail") ? "Cette ligne n'est pas un mail."
+    : action === "lu" ? "Ce mail est déjà lu." : action === "tache" ? "Ce mail est déjà une tâche." : "Action indisponible sur ce mail.", true);
 }
 async function lancerTache(inputs, workflow = "tache.yml") {
   if (DEMO) return;
@@ -1230,10 +1304,8 @@ function vueHermes(d) {
       liste(h.taches, "Rien à traiter. Ajoute une tâche ci-dessus, ou elles arriveront avec le briefing du matin.", ligneTache),
       el("p", { class: "secondaire", style: "margin:12px 0 0" }, "Coche une tâche quand elle est faite : celles qui viennent d'un mail se ferment aussi dans Gmail."))),
     el("div", { class: "s4" }, panneau("Boîte de réception", el("span", { class: "meta" }, h.non_lus + " NON LUS"), "",
-      liste(h.mails, "Boîte vide sur 3 jours.", (m) => lien(m.lien, { class: "rangee" },
-        el("span", { class: "losange" + (m.non_lu ? " plein" : "") }),
-        el("span", { class: "principal" }, el("strong", null, m.de), el("span", { class: "secondaire" }, m.objet), m.libelles.map((l) => el("span", { class: "etiquette" }, l))),
-        el("span", { class: "temps" }, quand(m.date)))))),
+      liste(h.mails, "Boîte vide sur 3 jours.", (m) => ligneMail(m, true)),
+      el("p", { class: "secondaire", style: "margin:12px 0 0" }, "Sur une ligne choisie : A en fait une tâche, U la marque comme lue, E l'archive dans Gmail."))),
     el("div", { class: "s3 pile" }, panneau("Répartition", null, "", donut, legende),
       panneau("Briefing", el("span", { class: "meta" }, d.briefing ? d.briefing.titre.toUpperCase() : ""), "",
         liste(d.briefing ? d.briefing.mails.filter((m) => m.genre !== "securite") : [], "Rien d'important.", (m) => el("div", { class: "rangee" },
@@ -1976,6 +2048,9 @@ function preparerClavier() {
     else if (listes && (k === "j" || k === "J" || k === "ArrowDown" && selection.index >= 0)) choisirLigne(selection.index + 1);
     else if (listes && (k === "k" || k === "K" || k === "ArrowUp" && selection.index >= 0)) choisirLigne(selection.index < 0 ? 0 : selection.index - 1);
     else if (listes && (k === "x" || k === "X")) cocherChoisie();
+    else if (listes && (k === "a" || k === "A")) agirMailChoisi("tache");
+    else if (listes && (k === "u" || k === "U")) agirMailChoisi("lu");
+    else if (listes && (k === "e" || k === "E")) agirMailChoisi("archiver");
     else if (listes && k === "Enter" && selection.index >= 0 && !document.activeElement?.matches("a, button")) fait = ouvrirChoisie();
     else if (k === "Escape" && selection.index >= 0) { $("vue").querySelectorAll(".rangee.choisie").forEach((r) => r.classList.remove("choisie")); selection.index = -1; }
     else fait = false;
