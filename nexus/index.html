@@ -267,6 +267,24 @@ button.case:hover::after { background: var(--m); }
 .edition-tache { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 6px; grid-column: 2 / 4; }
 .edition-tache input[type="text"] { grid-column: 1 / -1; width: 100%; }
 .form-brouillon > span:empty { display: block; }
+.form-evenement { display: grid; grid-template-columns: minmax(138px, 1.3fr) minmax(96px, 1fr) auto; gap: 6px; }
+.form-evenement input, .form-evenement select { min-width: 0; padding: 7px 9px; border: 1px solid var(--ligne-forte); background: var(--surface-cmd); color: var(--texte); font: 500 14px/1.2 var(--corps); }
+.form-evenement input:focus, .form-evenement select:focus { border-color: var(--m); outline: none; }
+.form-evenement input[name="titre"], .form-evenement input[name="lieu"] { grid-column: 1 / -1; }
+.form-evenement .cmd { padding: 7px 10px; }
+.edition-mail { display: grid; gap: 6px; grid-column: 2 / 4; min-width: 0; }
+.edition-mail + span { display: none; }
+.grille-plan { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 22px; }
+@media (max-width: 760px) { .grille-plan { grid-template-columns: minmax(0, 1fr); } }
+.planif-tache { cursor: grab; }
+.planif-tache.prise { background: color-mix(in srgb, var(--m) 14%, transparent); box-shadow: inset 2px 0 0 var(--m); }
+.poignee { color: var(--tres-doux); font-size: 12px; letter-spacing: -2px; }
+button.rangee.creneau { width: 100%; background: none; border: 0; border-bottom: 1px dashed var(--ligne); color: var(--texte); font: inherit; text-align: left; cursor: pointer; }
+.liste > li + li button.creneau { border-top: 0; }
+button.creneau:hover, button.creneau.survol { background: color-mix(in srgb, var(--m) 12%, transparent); box-shadow: inset 2px 0 0 var(--m); }
+button.creneau .temps { color: var(--m); }
+.duree-plan { float: right; letter-spacing: .08em; font-size: 10px; }
+.duree-plan select { margin-left: 6px; padding: 2px 4px; background: var(--surface-cmd); color: var(--texte); border: 1px solid var(--ligne-forte); font: 500 11px/1 var(--mono); }
 .edition-tache input { min-width: 0; padding: 7px 9px; border: 1px solid var(--m); background: var(--surface-cmd); color: var(--texte); font: 500 14px/1.2 var(--corps); }
 .edition-tache .cmd { padding: 6px 9px; }
 .edition-tache + span { display: none; }
@@ -671,6 +689,7 @@ kbd {
         <dt><kbd>M</kbd></dt><dd>Modifier le titre ou l'échéance de la tâche choisie</dd>
         <dt><kbd>Ctrl</kbd><kbd>Z</kbd></dt><dd>Annuler la dernière action (quelques secondes après)</dd>
         <dt><kbd>B</kbd></dt><dd>Brouillon de réponse au mail choisi, rédigé dans Gmail (tu relis et tu envoies)</dd>
+        <dt><kbd>C</kbd></dt><dd>Ajouter à l'agenda Google un rendez-vous tiré du mail choisi</dd>
         <dt><kbd>A</kbd></dt><dd>Faire une tâche du mail choisi (libellé « À traiter » dans Gmail)</dd>
         <dt><kbd>U</kbd></dt><dd>Marquer le mail choisi comme lu</dd>
         <dt><kbd>E</kbd></dt><dd>Archiver le mail choisi (il quitte la boîte de réception)</dd>
@@ -1209,6 +1228,7 @@ function tacheChoisie() {
 }
 function ouvrirEdition(t) { edition = t.id; rendre(); const champ = document.querySelector(".edition-tache input"); if (champ) { champ.focus(); champ.select(); } }
 function appliquerFaites(d) {
+  appliquerEvenements(d);
   appliquerAjoutees(d);
   appliquerModifiees(d);
   appliquerMails(d);
@@ -1245,6 +1265,7 @@ function appliquerAjoutees(d) {
    la tâche apparaît tout de suite dans « À traiter ». */
 const ACTIONS_MAIL = [
   { action: "brouillon", cle: "B", titre: "Brouillon de réponse dans Gmail", icone: "M9 8 4 12l5 4M4 12h10a6 6 0 0 1 6 6" },
+  { action: "agenda", cle: "C", titre: "Ajouter à l'agenda", icone: "M4 6h16v14H4zM4 10h16M8 3v4M16 3v4M12 13v5M9.5 15.5h5" },
   { action: "tache", cle: "A", titre: "En faire une tâche", icone: "M5 12l4 4L19 6" },
   { action: "lu", cle: "U", titre: "Marquer comme lu", icone: "M3 7l9 6 9-6M3 7v10h18V7" },
   { action: "archiver", cle: "E", titre: "Archiver", icone: "M4 8h16M6 8v11h12V8M10 12h4M3 4h18v4H3z" },
@@ -1289,10 +1310,13 @@ function formBrouillon(m) {
 }
 function ligneMail(m, libelles) {
   if (brouillonPour && brouillonPour === m.id) return formBrouillon(m);
+  if (agendaPour && agendaPour === m.id) return el("div", { class: "rangee mail", "data-mail": m.id }, el("span", { class: "losange plein" }),
+    el("div", { class: "edition-mail" }, el("span", { class: "secondaire" }, "Agenda · d'après le mail de " + m.de),
+      formEvenement({ titre: m.objet, email_id: m.id }, () => { agendaPour = null; rendre(); })), el("span"));
   const suivi = m.id && Object.values(lireAjoutees()).some((t) => t.mail === m.id);
   const boutons = m.id ? ACTIONS_MAIL.filter((a) => !(a.action === "lu" && !m.non_lu) && !(a.action === "tache" && suivi)).map((a) =>
     el("button", { class: "action-mail", type: "button", "data-action": a.action, title: a.titre + " (" + a.cle + ")", "aria-label": a.titre + " : " + m.objet,
-      onclick: (ev) => { ev.preventDefault(); a.action === "brouillon" ? ouvrirBrouillon(m) : agirMail(m, a.action, ev.currentTarget); } },
+      onclick: (ev) => { ev.preventDefault(); a.action === "brouillon" ? ouvrirBrouillon(m) : a.action === "agenda" ? ouvrirAgendaMail(m) : agirMail(m, a.action, ev.currentTarget); } },
       s("svg", { viewBox: "0 0 24 24", "aria-hidden": "true" }, s("path", { d: a.icone })))) : [];
   return el("div", { class: "rangee mail", "data-mail": m.id || "" },
     el("span", { class: "losange" + (m.non_lu ? " plein" : "") }),
@@ -1572,6 +1596,122 @@ function vueSemaine(d) {
       el("span", { class: "legende" }, [["chronos", "Agenda"], ["hermes", "Échéances"], ["ploutos", "Budget"], ["ares", "Sport"]].map(([m, l]) => el("span", null, el("i", { style: `background:var(--${m})` }), l)))),
     el("div", { class: "semaine" }, jours));
 }
+/* Ajouter à l'agenda (lot « agenda ») : workflow « Agenda » du dépôt olympe. L'événement s'affiche tout
+   de suite (gardé sur l'appareil dans nexus-evenements) en attendant la mise à jour des données. */
+function dateParis(local) {  // "AAAA-MM-JJTHH:MM" à l'heure de Paris → Date
+  const t = new Date(local + ":00Z");
+  const decalage = new Date(t.toLocaleString("en-US", { timeZone: FUSEAU })) - new Date(t.toLocaleString("en-US", { timeZone: "UTC" }));
+  return new Date(t - decalage);
+}
+const hhmm = (d) => fmtHeure.format(d);
+function lireEvenements() { try { return JSON.parse(localStorage.getItem("nexus-evenements") || "[]"); } catch { return []; } }
+function garderEvenements(e) { try { localStorage.setItem("nexus-evenements", JSON.stringify(e)); } catch {} }
+function vueEvenementLocal(e) {
+  const debut = dateParis(e.debut), fin = new Date(+debut + e.duree * 6e4);
+  return { titre: e.titre, lieu: e.lieu || "", debut: debut.toISOString(), fin: fin.toISOString(), journee_entiere: false,
+    date: e.debut.slice(0, 10), jour: fmtJour.format(debut), horaire: hhmm(debut) + " – " + hhmm(fin), attente: true, tache: !!e.tache };
+}
+function appliquerEvenements(d) {
+  const c = d.chronos, auj = jourParis(new Date());
+  c.aujourdhui = c.aujourdhui.filter((e) => !e.attente); c.bientot = c.bientot.filter((e) => !e.attente);
+  const tous = [...c.aujourdhui, ...c.bientot];
+  const restants = lireEvenements().filter((e) => {
+    const v = vueEvenementLocal(e);
+    const recu = tous.some((x) => x.titre === v.titre && x.debut && +new Date(x.debut) === +new Date(v.debut));
+    if (recu || Date.now() - e.cree > 864e5 || new Date(v.fin) < Date.now() - 36e5 * 12) return false;
+    (v.date === auj ? c.aujourdhui : c.bientot).push(v);
+    return true;
+  });
+  garderEvenements(restants);
+  c.aujourdhui.sort((a, b) => +new Date(a.debut) - +new Date(b.debut)); c.bientot.sort((a, b) => +new Date(a.debut) - +new Date(b.debut));
+  return d;
+}
+async function ajouterEvenement(e) {
+  e = { ...e, titre: (e.titre || "").replace(/\s+/g, " ").trim().slice(0, 200), duree: +e.duree || 60 };
+  if (!e.titre || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(e.debut)) { avis("Il faut un titre, une date et une heure.", true); return false; }
+  try {
+    await lancerTache({ titre: e.titre, debut: e.debut, duree: String(e.duree), lieu: e.lieu || "", email_id: e.email_id || "", tache: e.tache ? "oui" : "" }, "agenda.yml");
+  } catch (er) { avis(er instanceof TypeError ? "Pas de connexion. Réessaie." : er.message, true); return false; }
+  garderEvenements([...lireEvenements(), { ...e, cree: Date.now() }]);
+  appliquerEvenements(donnees);
+  const v = vueEvenementLocal(e);
+  avis("Ajouté à l'agenda : " + v.titre + ", " + v.jour.toLowerCase() + " " + v.horaire);
+  rendre();
+  return true;
+}
+function formEvenement(init, apres) {
+  const demain = new Date(); demain.setDate(demain.getDate() + 1);
+  const titre = el("input", { type: "text", name: "titre", value: init.titre || "", placeholder: "Titre de l'événement", "aria-label": "Titre de l'événement", maxlength: "200", autocomplete: "off" });
+  const date = el("input", { type: "date", name: "date", value: init.date || jourParis(demain), "aria-label": "Date" });
+  const heure = el("input", { type: "time", name: "heure", value: init.heure || "09:00", step: "900", "aria-label": "Heure" });
+  const duree = el("select", { name: "duree", "aria-label": "Durée" }, [15, 30, 45, 60, 90, 120, 180].map((m) =>
+    el("option", { value: String(m), selected: m === (init.duree || 60) ? "" : null }, m < 60 ? m + " min" : (m / 60 + " h").replace(".5", " h 30").replace(" h h", " h"))));
+  const lieu = el("input", { type: "text", name: "lieu", placeholder: "Lieu (facultatif)", "aria-label": "Lieu", maxlength: "200", autocomplete: "off" });
+  const f = el("form", { class: "form-evenement", onsubmit: async (ev) => {
+      ev.preventDefault();
+      f.querySelectorAll("input, select, button").forEach((x) => { x.disabled = true; });
+      const ok = await ajouterEvenement({ titre: titre.value, debut: date.value + "T" + heure.value, duree: duree.value, lieu: lieu.value, email_id: init.email_id });
+      f.querySelectorAll("input, select, button").forEach((x) => { x.disabled = false; });
+      if (ok) { titre.value = ""; lieu.value = ""; if (apres) apres(); }
+    }, onkeydown: (ev) => { if (ev.key === "Escape" && apres) { ev.preventDefault(); ev.stopPropagation(); apres(); } } },
+    titre, date, heure, duree, lieu, el("button", { class: "cmd", type: "submit" }, "AJOUTER"),
+    apres ? el("button", { class: "cmd", type: "button", onclick: apres }, "ANNULER") : null);
+  return f;
+}
+let agendaPour = null;  // mail en cours d'ajout à l'agenda (touche C)
+function ouvrirAgendaMail(m) { agendaPour = m.id; brouillonPour = null; rendre(); const c = document.querySelector(".rangee.mail .form-evenement input"); if (c) c.focus(); }
+function nouvelEvenement() {
+  aller("chronos");
+  setTimeout(() => { const c = document.querySelector("#nouvel-evenement input"); if (c) { c.focus(); c.scrollIntoView({ block: "center" }); } }, 60);
+}
+
+/* Planifier la journée : les créneaux libres d'aujourd'hui (8 h à 21 h, au moins 30 min) ; on y pose une
+   tâche, en la glissant ou en la choisissant puis en touchant le créneau, et un événement la réserve. */
+let tachePlanifiee = null, dureePlan = 60;
+function creneauxLibres(d) {
+  const auj = jourParis(new Date());
+  const ouverture = dateParis(auj + "T08:00"), fermeture = dateParis(auj + "T21:00");
+  let depart = new Date(Math.max(+ouverture, Math.ceil(Date.now() / 18e5) * 18e5));
+  const pris = d.chronos.aujourdhui.filter((e) => !e.journee_entiere && e.debut && e.fin)
+    .map((e) => [new Date(e.debut), new Date(e.fin)]).sort((a, b) => a[0] - b[0]);
+  const libres = [];
+  for (const [a, b] of pris) {
+    if (a - depart >= 18e5) libres.push([depart, a]);
+    if (b > depart) depart = b;
+  }
+  if (fermeture - depart >= 18e5) libres.push([depart, fermeture]);
+  return libres.filter(([a, b]) => b > a && a < fermeture);
+}
+function planifier(t, [a, b]) {
+  const duree = Math.min(dureePlan, Math.round((b - a) / 6e4));
+  const debut = jourParis(a) + "T" + hhmm(a);
+  tachePlanifiee = null;
+  return ajouterEvenement({ titre: t.titre, debut, duree, email_id: t.lien && /^[A-Za-z0-9]+$/.test(t.id) && !t.manuelle ? t.id : "", tache: true });
+}
+function panneauPlanifier(d) {
+  const libres = creneauxLibres(d);
+  const taches = d.hermes.taches.slice(0, 8);
+  const longueur = ([a, b]) => { const m = Math.round((b - a) / 6e4); return m >= 60 ? Math.floor(m / 60) + " h" + (m % 60 ? " " + String(m % 60).padStart(2, "0") : "") : m + " min"; };
+  const choixDuree = el("select", { "aria-label": "Durée réservée", onchange: (ev) => { dureePlan = +ev.target.value; } },
+    [30, 60, 90, 120].map((m) => el("option", { value: String(m), selected: m === dureePlan ? "" : null }, m < 60 ? m + " min" : (m / 60 + " h").replace(".5 h", " h 30"))));
+  const colTaches = liste(taches, "Aucune tâche ouverte.", (t) => el("div", { class: "rangee planif-tache" + (tachePlanifiee === t.id ? " prise" : ""), draggable: "true",
+      ondragstart: (ev) => { ev.dataTransfer.setData("text/plain", t.id); ev.dataTransfer.effectAllowed = "copy"; },
+      onclick: () => { tachePlanifiee = tachePlanifiee === t.id ? null : t.id; rendre(); } },
+    el("span", { class: "poignee", "aria-hidden": "true" }, "⋮⋮"), el("span", { class: "principal" }, t.titre, el("span", { class: "secondaire" }, t.quand ? t.quand.toLowerCase() : "sans échéance")), el("span")));
+  const colCreneaux = liste(libres, "Plus de créneau libre aujourd'hui (8 h à 21 h).", (c) => {
+    const poser = (id) => { const t = d.hermes.taches.find((x) => x.id === id); if (t) planifier(t, c); };
+    return el("button", { class: "rangee creneau", type: "button",
+        ondragover: (ev) => { ev.preventDefault(); ev.currentTarget.classList.add("survol"); },
+        ondragleave: (ev) => ev.currentTarget.classList.remove("survol"),
+        ondrop: (ev) => { ev.preventDefault(); ev.currentTarget.classList.remove("survol"); poser(ev.dataTransfer.getData("text/plain")); },
+        onclick: () => tachePlanifiee ? poser(tachePlanifiee) : avis("Choisis d'abord une tâche à gauche, ou glisse-la ici.", true) },
+      el("span", { class: "horaire" }, hhmm(c[0]) + " – " + hhmm(c[1])), el("span", { class: "principal" }, longueur(c) + " libres"), el("span", { class: "temps" }, "POSER ICI"));
+  });
+  return panneau("Planifier la journée", el("span", { class: "meta" }, "GLISSE UNE TÂCHE SUR UN CRÉNEAU"), "",
+    el("div", { class: "grille-plan" },
+      el("div", null, el("h3", { class: "sous-titre" }, "Tâches"), colTaches),
+      el("div", null, el("h3", { class: "sous-titre" }, "Créneaux libres aujourd'hui", el("span", { class: "duree-plan" }, "Réserver ", choixDuree)), colCreneaux)));
+}
 function vueChronos(d) {
   const c = d.chronos;
   return el("div", { class: "grille" },
@@ -1579,6 +1719,8 @@ function vueChronos(d) {
     el("div", { class: "s7 pile" }, panneau("Aujourd'hui", el("span", { class: "compte" }, String(c.aujourdhui.length)), "",
       liste(c.aujourdhui, "Rien dans l'agenda aujourd'hui.", ligneEvenement)),
       (c.conflits || []).length ? panneau("Conflits", null, "alerte", liste(c.conflits, "", (x) => el("div", { class: "rangee" }, el("span", { class: "losange plein" }), el("span", null, x), el("span")))) : null),
+    el("div", { class: "s7" }, panneauPlanifier(d)),
+    el("div", { class: "s5", id: "nouvel-evenement" }, panneau("Nouvel événement", el("span", { class: "meta" }, "AGENDA GOOGLE"), "", formEvenement({}))),
     el("div", { class: "s12", id: "semaine" }, vueSemaine(d)));
 }
 
@@ -2173,6 +2315,8 @@ function elementsPalette() {
     { groupe: "Actions", titre: document.documentElement.dataset.theme === "clair" ? "Thème sombre" : "Thème clair", cle: "T", faire: basculerTheme },
     { groupe: "Actions", titre: "Vue semaine", sous: "agenda, échéances, budget, sport", cle: "S", faire: allerSemaine },
     { groupe: "Actions", titre: "Nouvelle tâche", sous: "avec une échéance", cle: "N", faire: nouvelleTache },
+    { groupe: "Actions", titre: "Nouvel événement", sous: "dans l'agenda Google", faire: nouvelEvenement },
+    { groupe: "Actions", titre: "Planifier la journée", sous: "poser des tâches sur les créneaux libres", faire: () => { aller("chronos"); setTimeout(() => document.querySelector(".grille-plan")?.scrollIntoView({ block: "center" }), 60); } },
     { groupe: "Actions", titre: "Actualiser les données", cle: "R", faire: () => $("rafraichir").click() },
     { groupe: "Actions", titre: notifsActives() ? "Réactiver les notifications" : "Activer les notifications", sous: "iPhone et PC", faire: activerNotifs },
     { groupe: "Actions", titre: "Santé du système", sous: libelleSante(bilanSante()), cle: "H", faire: ouvrirSante },
@@ -2332,6 +2476,7 @@ function preparerClavier() {
     else if (listes && (k === "p" || k === "P")) { const t = tacheChoisie(); t ? repousser(t, ev.shiftKey ? 7 : 1) : avis("Choisis d'abord une tâche avec J ou K.", true); }
     else if (listes && (k === "m" || k === "M")) { const t = tacheChoisie(); t ? ouvrirEdition(t) : avis("Choisis d'abord une tâche avec J ou K.", true); }
     else if (listes && (k === "b" || k === "B")) agirMailChoisi("brouillon");
+    else if (listes && (k === "c" || k === "C")) agirMailChoisi("agenda");
     else if (listes && (k === "a" || k === "A")) agirMailChoisi("tache");
     else if (listes && (k === "u" || k === "U")) agirMailChoisi("lu");
     else if (listes && (k === "e" || k === "E")) agirMailChoisi("archiver");
