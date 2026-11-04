@@ -265,6 +265,10 @@ button.case:hover::after { background: var(--m); }
 .jour.aujourdhui { border-color: var(--m); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--m) 40%, transparent); }
 .jour h4 { margin: 0 0 4px; font: 700 10px/1.3 var(--titre); letter-spacing: .14em; color: var(--doux); text-transform: uppercase; }
 .jour.aujourdhui h4 { color: var(--m); }
+.jour.passe { opacity: .7; }
+.legende { margin-left: auto; display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; font-size: 12px; color: var(--doux); }
+.legende span { display: inline-flex; align-items: center; gap: 6px; }
+.legende i { width: 10px; height: 3px; display: inline-block; }
 .evt { font-size: 12px; line-height: 1.3; padding: 5px 6px; border-left: 2px solid var(--m); background: color-mix(in srgb, var(--m) 9%, transparent); overflow-wrap: anywhere; }
 .evt b { display: block; font: 500 10px/1.2 var(--mono); color: var(--m); }
 .horaire { font: 500 12px/1.3 var(--mono); color: var(--m); white-space: nowrap; font-variant-numeric: tabular-nums; min-width: 88px; }
@@ -610,6 +614,7 @@ kbd {
         <dt><kbd>F</kbd></dt><dd>Mode focus : seulement les priorités du jour</dd>
         <dt><kbd>T</kbd></dt><dd>Thème clair ou sombre</dd>
         <dt><kbd>N</kbd></dt><dd>Nouvelle tâche (dans Ctrl+K, tape son titre puis choisis « Nouvelle tâche »)</dd>
+        <dt><kbd>S</kbd></dt><dd>Vue semaine (agenda, échéances, budget, sport)</dd>
         <dt><kbd>R</kbd></dt><dd>Actualiser les données</dd>
         <dt><kbd>?</kbd></dt><dd>Cette aide</dd>
       </dl>
@@ -1140,6 +1145,11 @@ function formNouvelleTache() {
   titre.addEventListener("keydown", (ev) => { if (ev.key === "Escape") titre.blur(); });
   return f;
 }
+function allerSemaine() {
+  decalageSemaine = 0;
+  if (courant !== "chronos") aller("chronos"); else rendre();
+  setTimeout(() => $("semaine")?.scrollIntoView({ block: "start", behavior: CALME ? "auto" : "smooth" }), 60);
+}
 function nouvelleTache() {
   const go = () => { const i = document.querySelector(".nouvelle-tache input"); if (i) { i.scrollIntoView({ block: "center" }); i.focus(); } };
   if (courant !== "nexus" && courant !== "hermes") { aller("hermes"); setTimeout(go, 60); } else go();
@@ -1263,22 +1273,48 @@ function ligneEvenement(e) {
   return el("div", { class: "rangee" }, el("span", { class: "horaire" }, e.horaire),
     el("span", { class: "principal" }, e.titre, e.lieu ? el("span", { class: "secondaire" }, e.lieu) : null), el("span"));
 }
+/* Vue semaine unifiée : du lundi au dimanche, l'agenda, les tâches à échéance, le point budget
+   et les séances de sport déjà faites, chacun dans la couleur de son module. */
+let decalageSemaine = 0;
+function vueSemaine(d) {
+  const c = d.chronos, auj = jourParis(new Date());
+  const ajouterJours = (iso, n) => { const x = new Date(iso + "T12:00:00Z"); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
+  const jourSemaine = (new Date(auj + "T12:00:00Z").getUTCDay() + 6) % 7;  // 0 = lundi
+  const lundi = ajouterJours(auj, -jourSemaine + 7 * decalageSemaine);
+  const limite = ajouterJours(auj, 7);  // l'agenda est chargé sur 7 jours
+  const seances = d.ares && !d.ares.erreur ? d.ares.dernieres : [];
+  const jours = [];
+  let total = 0;
+  for (let i = 0; i < 7; i++) {
+    const iso = ajouterJours(lundi, i), passe = iso < auj;
+    const items = [];
+    const evts = iso === auj ? c.aujourdhui : c.bientot.filter((e) => e.date === iso);
+    for (const e of evts) items.push(el("div", { class: "evt", style: "--m:var(--chronos)" }, el("b", null, e.journee_entiere ? "JOURNÉE" : e.horaire), e.titre));
+    for (const t of d.hermes.taches.filter((t) => (t.echeance === iso && !t.retard) || (iso === auj && t.retard)))
+      items.push(el("div", { class: "evt", style: "--m:var(" + (t.retard ? "--alerte" : "--hermes") + ")" }, el("b", null, t.retard ? "EN RETARD" : "ÉCHÉANCE"), t.titre));
+    if (d.ploutos.point_budget_date === iso) items.push(el("div", { class: "evt", style: "--m:var(--ploutos)" }, el("b", null, "PLOUTOS"), "Point budget"));
+    for (const x of seances.filter((x) => x.date.slice(0, 10) === iso))
+      items.push(el("div", { class: "evt", style: "--m:var(--ares)" }, el("b", null, "SÉANCE · " + x.minutes + " MIN"), x.titre));
+    total += items.length;
+    const vide = iso > limite ? "pas encore chargé" : passe ? "—" : "libre";
+    jours.push(el("div", { class: "jour" + (iso === auj ? " aujourdhui" : "") + (passe ? " passe" : "") },
+      el("h4", null, iso === auj ? "Aujourd'hui" : fmtJour.format(new Date(iso + "T12:00:00"))),
+      items.length ? items : el("span", { class: "secondaire" }, vide)));
+  }
+  const bouton = (texte, n) => el("button", { class: "filtre", type: "button", "aria-pressed": String(decalageSemaine === n), onclick: () => { decalageSemaine = n; rendre(); } }, texte);
+  return panneau("Semaine", el("span", { class: "meta" }, total + " ÉLÉMENTS"), "",
+    el("div", { class: "filtres" }, bouton("CETTE SEMAINE", 0), bouton("SEMAINE PROCHAINE", 1),
+      el("span", { class: "legende" }, [["chronos", "Agenda"], ["hermes", "Échéances"], ["ploutos", "Budget"], ["ares", "Sport"]].map(([m, l]) => el("span", null, el("i", { style: `background:var(--${m})` }), l)))),
+    el("div", { class: "semaine" }, jours));
+}
 function vueChronos(d) {
   const c = d.chronos;
-  const jours = [];
-  for (let i = 0; i < 7; i++) {
-    const date = new Date(Date.now() + i * 864e5), iso = jourParis(date);
-    const evts = i === 0 ? c.aujourdhui : c.bientot.filter((e) => e.date === iso);
-    jours.push(el("div", { class: "jour" + (i === 0 ? " aujourdhui" : "") },
-      el("h4", null, i === 0 ? "Aujourd'hui" : fmtJour.format(date)),
-      evts.length ? evts.map((e) => el("div", { class: "evt" }, el("b", null, e.journee_entiere ? "JOURNÉE" : e.horaire), e.titre)) : el("span", { class: "secondaire" }, "libre")));
-  }
   return el("div", { class: "grille" },
     el("div", { class: "s5" }, panneau("Cadran 24 h", el("span", { class: "meta" }, String(c.heures_occupees).replace(".", ",") + " H OCCUPÉES"), "", horloge24(c.aujourdhui))),
     el("div", { class: "s7 pile" }, panneau("Aujourd'hui", el("span", { class: "compte" }, String(c.aujourdhui.length)), "",
       liste(c.aujourdhui, "Rien dans l'agenda aujourd'hui.", ligneEvenement)),
       (c.conflits || []).length ? panneau("Conflits", null, "alerte", liste(c.conflits, "", (x) => el("div", { class: "rangee" }, el("span", { class: "losange plein" }), el("span", null, x), el("span")))) : null),
-    el("div", { class: "s12" }, panneau("7 prochains jours", el("span", { class: "meta" }, c.bientot.length + " ÉVÉNEMENTS"), "", el("div", { class: "semaine" }, jours))));
+    el("div", { class: "s12", id: "semaine" }, vueSemaine(d)));
 }
 
 /* --- PLOUTOS : module chargé à la demande (ploutos-moteur.js, ploutos-coffre.js, ploutos.js, ploutos.css) --- */
@@ -1828,6 +1864,7 @@ function elementsPalette() {
   items.push(
     { groupe: "Actions", titre: modeFocus ? "Quitter le mode focus" : "Mode focus", sous: "priorités du jour", cle: "F", faire: basculerFocus },
     { groupe: "Actions", titre: document.documentElement.dataset.theme === "clair" ? "Thème sombre" : "Thème clair", cle: "T", faire: basculerTheme },
+    { groupe: "Actions", titre: "Vue semaine", sous: "agenda, échéances, budget, sport", cle: "S", faire: allerSemaine },
     { groupe: "Actions", titre: "Nouvelle tâche", sous: "avec une échéance", cle: "N", faire: nouvelleTache },
     { groupe: "Actions", titre: "Actualiser les données", cle: "R", faire: () => $("rafraichir").click() },
     { groupe: "Actions", titre: notifsActives() ? "Réactiver les notifications" : "Activer les notifications", sous: "iPhone et PC", faire: activerNotifs },
@@ -1935,6 +1972,7 @@ function preparerClavier() {
     else if (k === "t" || k === "T") basculerTheme();
     else if (k === "r" || k === "R") $("rafraichir").click();
     else if (k === "n" || k === "N") nouvelleTache();
+    else if (k === "s" || k === "S") allerSemaine();
     else if (listes && (k === "j" || k === "J" || k === "ArrowDown" && selection.index >= 0)) choisirLigne(selection.index + 1);
     else if (listes && (k === "k" || k === "K" || k === "ArrowUp" && selection.index >= 0)) choisirLigne(selection.index < 0 ? 0 : selection.index - 1);
     else if (listes && (k === "x" || k === "X")) cocherChoisie();
