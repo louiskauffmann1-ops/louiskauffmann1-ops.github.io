@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-title" content="NEXUS">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icone.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="icone-192.png">
+<link rel="apple-touch-icon" href="icone-180.png">
 <!-- PAGE -->
 <title>NEXUS</title>
 <meta name="claude:viewport-fit-sides" content="cover">
@@ -373,6 +373,127 @@ button.case:hover::after { background: var(--m); }
 .j-cout { font: 400 10px/1 var(--mono); color: var(--tres-doux); letter-spacing: .08em; }
 .j-msg .curseur { display: inline-block; width: .55em; height: 1em; vertical-align: -2px; background: var(--nexus); margin-left: 2px; animation: clignoter 1s steps(1) infinite; }
 
+/* ---------- Ordinateur : barre latérale, accueil en tuiles, clavier, focus, thème clair ---------- */
+kbd {
+  display: inline-block; min-width: 20px; padding: 3px 5px; border: 1px solid var(--ligne-forte); border-bottom-width: 2px;
+  font: 500 10px/1 var(--mono); color: var(--doux); text-align: center; letter-spacing: 0; background: none;
+}
+.rail-modules { display: contents; }
+.rail-tete, .rail-bas { display: none; }
+.recherche {
+  display: inline-flex; align-items: center; gap: 10px; min-width: 0; padding: 7px 10px 7px 12px; cursor: pointer;
+  border: 1px solid var(--ligne-forte); background: var(--surface-cmd); color: var(--doux); font: 500 13px/1 var(--corps);
+}
+.recherche:hover { border-color: var(--m); color: var(--texte); }
+.recherche svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.8; flex: none; }
+.recherche .texte { white-space: nowrap; }
+.rangee { margin-inline: -8px; padding-inline: 8px; scroll-margin: 90px 0 40px; }
+.rangee.choisie { background: color-mix(in srgb, var(--m) 11%, transparent); box-shadow: inset 2px 0 0 var(--m); outline: none; }
+.accueil-tuiles { align-items: stretch; }
+.accueil-tuiles > div > .panneau { height: 100%; }
+.accueil.focus { grid-template-columns: minmax(0, 1fr); max-width: 860px; }
+.bandeau-focus {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 0 18px; padding: 9px 12px;
+  border: 1px dashed color-mix(in srgb, var(--nexus) 45%, transparent); color: var(--doux); font-size: 13px;
+}
+.bandeau-focus b { font: 700 11px/1 var(--titre); letter-spacing: .2em; color: var(--nexus); }
+.bandeau-focus button { margin-left: auto; }
+.chiffres { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 4px; }
+.chiffre { display: grid; gap: 4px; }
+.chiffre b { font: 700 24px/1.1 var(--titre); letter-spacing: .02em; font-variant-numeric: tabular-nums; }
+.chiffre span { font: 500 10px/1.2 var(--mono); letter-spacing: .14em; color: var(--doux); text-transform: uppercase; }
+
+/* Fenêtres : barre de commande et aide clavier */
+.voile {
+  position: fixed; inset: 0; z-index: 60; display: grid; justify-items: center; align-items: start;
+  padding: max(10vh, 24px) 16px 16px; background: var(--voile); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
+}
+.fenetre {
+  width: min(640px, 100%); max-height: min(560px, 80vh); display: grid; grid-template-rows: auto minmax(0, 1fr) auto;
+  background: var(--surface-haute); border: 1px solid var(--ligne-forte); box-shadow: 0 30px 80px rgba(0, 0, 0, .45);
+  animation: entrer .18s ease-out;
+}
+.palette-saisie { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--ligne); }
+.palette-saisie svg { width: 18px; height: 18px; stroke: var(--nexus); fill: none; stroke-width: 1.8; flex: none; }
+.palette-saisie input { flex: 1; min-width: 0; border: 0; background: none; outline: none; font: 500 17px/1.3 var(--corps); color: var(--texte); }
+.palette-liste { list-style: none; margin: 0; padding: 6px; overflow-y: auto; overscroll-behavior: contain; }
+.palette-groupe { padding: 10px 10px 4px; font: 600 10px/1 var(--titre); letter-spacing: .2em; color: var(--tres-doux); text-transform: uppercase; }
+.palette-choix { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 9px 10px; cursor: pointer; }
+.palette-choix .losange { border-color: var(--c, var(--doux)); }
+.palette-choix .principal { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.palette-choix .secondaire { display: inline; margin: 0 0 0 8px; font-size: 12px; }
+.palette-choix[aria-selected="true"] { background: color-mix(in srgb, var(--c, var(--nexus)) 13%, transparent); box-shadow: inset 2px 0 0 var(--c, var(--nexus)); }
+.palette-choix[aria-selected="true"] .losange { background: var(--c, var(--nexus)); }
+.palette-vide { padding: 18px 10px; color: var(--doux); font-size: 14px; }
+.fenetre-pied { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 10px 16px; border-top: 1px solid var(--ligne); font-size: 12px; color: var(--doux); }
+.fenetre-pied .sep { width: 10px; }
+.aide { padding: 6px 18px 12px; overflow-y: auto; }
+.aide h2 { margin: 14px 0 6px; font: 700 11px/1.2 var(--titre); letter-spacing: .22em; color: var(--nexus); text-transform: uppercase; }
+.aide dl { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 8px 14px; margin: 0; align-items: center; }
+.aide dt { display: flex; gap: 4px; }
+.aide dd { margin: 0; font-size: 14px; }
+.fenetre-tete { display: flex; align-items: center; gap: 10px; padding: 14px 18px; border-bottom: 1px solid var(--ligne); }
+.fenetre-tete b { font: 700 13px/1 var(--titre); letter-spacing: .24em; color: var(--nexus); }
+.fenetre-tete .cmd { margin-left: auto; padding: 6px 8px; }
+
+@media (min-width: 761px) {
+  :root { --rail: 236px; }
+  .rail { align-items: stretch; gap: 0; padding: 18px 12px 16px; overflow-y: auto; }
+  .rail-tete { display: flex; align-items: center; gap: 12px; padding: 2px 8px 20px; }
+  .rail-tete .logo { width: 38px; height: 38px; margin: 0; flex: none; }
+  .rail-tete span { font: 900 15px/1 var(--titre); letter-spacing: .34em; color: var(--nexus); }
+  .rail-modules { display: grid; gap: 2px; }
+  .onglet { width: 100%; grid-template-columns: 38px minmax(0, 1fr) auto; justify-items: start; align-items: center; gap: 12px; padding: 6px 8px; text-align: left; }
+  .onglet .anneau { width: 38px; height: 38px; }
+  .onglet svg { width: 19px; height: 19px; }
+  .onglet .libelle { display: grid; gap: 4px; min-width: 0; }
+  .onglet span.nom { font-size: 11px; }
+  .onglet .sous { font: 500 12px/1.2 var(--corps); color: var(--tres-doux); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .onglet:hover, .onglet[aria-current="page"] { background: color-mix(in srgb, var(--c) 9%, transparent); }
+  .onglet[aria-current="page"] { box-shadow: inset 2px 0 0 var(--c); }
+  .onglet[aria-current="page"] .sous { color: var(--doux); }
+  .rail-bas { display: grid; gap: 2px; margin-top: auto; padding-top: 14px; border-top: 1px solid var(--ligne); }
+  .rail-bouton {
+    display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; cursor: pointer; text-align: left;
+    background: none; border: 0; color: var(--doux); font: 500 13px/1.2 var(--corps);
+  }
+  .rail-bouton:hover { color: var(--texte); background: color-mix(in srgb, var(--nexus) 7%, transparent); }
+  .rail-bouton[aria-pressed="true"] { color: var(--nexus); }
+  .rail-bouton svg { width: 17px; height: 17px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+  .rail-bouton kbd { margin-left: auto; }
+  .contenu { padding-left: 32px; padding-right: max(32px, env(safe-area-inset-right, 0px)); }
+  .recherche { width: min(340px, 34vw); }
+  .recherche kbd { margin-left: auto; }
+}
+@media (max-width: 760px) {
+  .onglet .sous, .onglet kbd, .recherche .texte, .recherche kbd { display: none; }
+  .rangee { margin-inline: 0; padding-inline: 0; }
+}
+
+/* Thème clair (touche T) : même structure, couleurs de jour. PLOUTOS garde son propre style. */
+:root { --surface-cmd: rgba(8, 18, 28, .8); --surface-haute: rgba(5, 12, 20, .98); --voile: rgba(2, 5, 9, .6); }
+:root[data-theme="clair"] {
+  color-scheme: light;
+  --fond: #eef3f7; --ligne: rgba(16, 58, 88, .13); --ligne-forte: rgba(16, 58, 88, .26);
+  --texte: #0c1a24; --doux: #4a5f70; --tres-doux: #5d7282;
+  --alerte: #c42638; --ambre: #a85f00;
+  --nexus: #087a9e; --hermes: #1d68ad; --chronos: #a85f00; --ploutos: #0b7f4f; --pheme: #6a42c4; --ares: #bf3227;
+  --surface-cmd: #ffffff; --surface-haute: #ffffff; --voile: rgba(12, 26, 36, .35);
+}
+:root[data-theme="clair"] .ambiance::after, :root[data-theme="clair"] .balayage { display: none; }
+:root[data-theme="clair"] .rail { background: rgba(255, 255, 255, .88); }
+:root[data-theme="clair"] .cmd { background: #fff; }
+:root[data-theme="clair"] .panneau { background: linear-gradient(160deg, #ffffff, #f8fbfd); box-shadow: 0 1px 2px rgba(12, 26, 36, .05); }
+:root[data-theme="clair"] .panneau.alerte { background: #fff3f4; border-color: rgba(196, 38, 56, .3); }
+:root[data-theme="clair"] .telescripteur, :root[data-theme="clair"] .jour { background: #fff; }
+:root[data-theme="clair"] .hors-ligne .msg { background: rgba(255, 255, 255, .92); }
+:root[data-theme="clair"] .verrou input { background: #fff; }
+:root[data-theme="clair"] .avis { background: #f1fbf6; }
+:root[data-theme="clair"] .avis.erreur { background: #fff3f4; }
+:root[data-theme="clair"] .tete-module h1, :root[data-theme="clair"] .reacteur .h { text-shadow: none; }
+:root[data-theme="clair"] .fenetre { box-shadow: 0 24px 60px rgba(12, 26, 36, .18); }
+:root[data-theme="clair"] .priorites b, :root[data-theme="clair"] .telescripteur .tag, :root[data-theme="clair"] .filtre[aria-pressed="true"] { color: #fff; }
+
 @media (max-width: 1100px) {
   .accueil { grid-template-columns: minmax(0, 1fr) minmax(240px, 320px); }
   .accueil .col-jauges { grid-column: span 2; }
@@ -433,18 +554,63 @@ button.case:hover::after { background: var(--m); }
 
 <div class="appli" id="appli" hidden>
   <nav class="rail" id="rail" aria-label="Modules">
-    <svg class="logo" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="21" fill="none" stroke="#4fdcff" stroke-width="1.5" stroke-dasharray="6 4" opacity=".7"/><circle cx="24" cy="24" r="14" fill="none" stroke="#4fdcff" stroke-width="3" stroke-dasharray="30 14"/><circle cx="24" cy="24" r="5" fill="#4fdcff"/></svg>
+    <div class="rail-tete">
+      <svg class="logo" viewBox="0 0 200 200" aria-hidden="true"><g fill="none" stroke="var(--nexus)"><circle cx="100" cy="100" r="84" stroke-width="5" stroke-dasharray="380 148" transform="rotate(-90 100 100)"/><circle cx="100" cy="100" r="70" stroke-width="16" stroke-dasharray="56 17.3" transform="rotate(-83 100 100)"/><circle cx="100" cy="100" r="44" stroke-width="8" stroke-dasharray="70 22" transform="rotate(-60 100 100)" opacity=".8"/></g><circle cx="100" cy="100" r="20" fill="var(--nexus)" opacity=".5"/><circle cx="100" cy="100" r="10" fill="var(--nexus)"/></svg>
+      <span>NEXUS</span>
+    </div>
+    <div class="rail-modules" id="rail-modules"></div>
+    <div class="rail-bas">
+      <button class="rail-bouton" id="bouton-focus" type="button" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg>Mode focus<kbd>F</kbd></button>
+      <button class="rail-bouton" id="bouton-theme" type="button" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>Thème clair<kbd>T</kbd></button>
+      <button class="rail-bouton" id="bouton-aide" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="1"/><path d="M6 10h1M10 10h1M14 10h1M18 10h0M7 14h10"/></svg>Raccourcis clavier<kbd>?</kbd></button>
+    </div>
   </nav>
   <div class="contenu">
     <header class="bandeau">
       <span class="marque">NEXUS<small>OLYMPE</small></span>
       <span class="puces-etat" id="puces-etat"></span>
       <span class="commandes">
+        <button class="recherche" id="ouvrir-palette" type="button" aria-label="Rechercher ou aller à (Ctrl K)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><span class="texte">Rechercher ou aller à…</span><kbd>Ctrl K</kbd></button>
         <button class="cmd" id="rafraichir" type="button" title="Actualiser"><svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg><span class="texte">ACTUALISER</span></button>
         <button class="cmd" id="verrouiller" type="button" title="Verrouiller"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><span class="texte">VERROUILLER</span></button>
       </span>
     </header>
     <main id="vue"></main>
+  </div>
+</div>
+
+<div class="voile" id="palette" hidden>
+  <div class="fenetre" role="dialog" aria-modal="true" aria-label="Barre de commande">
+    <div class="palette-saisie">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+      <input id="palette-saisie" type="text" autocomplete="off" spellcheck="false" role="combobox" aria-expanded="true" aria-controls="palette-liste" aria-autocomplete="list" placeholder="Aller à un module, une tâche, un mail, un événement…">
+    </div>
+    <ul class="palette-liste" id="palette-liste" role="listbox" aria-label="Résultats"></ul>
+    <div class="fenetre-pied"><kbd>↑</kbd><kbd>↓</kbd> choisir <span class="sep"></span><kbd>Entrée</kbd> ouvrir <span class="sep"></span><kbd>Échap</kbd> fermer</div>
+  </div>
+</div>
+<div class="voile" id="aide-clavier" hidden>
+  <div class="fenetre" role="dialog" aria-modal="true" aria-labelledby="aide-titre">
+    <div class="fenetre-tete"><b id="aide-titre">RACCOURCIS CLAVIER</b><button class="cmd" id="aide-fermer" type="button" aria-label="Fermer"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <div class="aide">
+      <h2>Partout</h2>
+      <dl>
+        <dt><kbd>Ctrl</kbd><kbd>K</kbd></dt><dd>Barre de commande : aller à un module, une tâche, un mail, un événement</dd>
+        <dt><kbd>1</kbd>…<kbd>6</kbd></dt><dd>Changer de module (1 = NEXUS, 2 = HERMÈS…)</dd>
+        <dt><kbd>F</kbd></dt><dd>Mode focus : seulement les priorités du jour</dd>
+        <dt><kbd>T</kbd></dt><dd>Thème clair ou sombre</dd>
+        <dt><kbd>R</kbd></dt><dd>Actualiser les données</dd>
+        <dt><kbd>?</kbd></dt><dd>Cette aide</dd>
+      </dl>
+      <h2>Dans les listes</h2>
+      <dl>
+        <dt><kbd>J</kbd> <kbd>K</kbd></dt><dd>Ligne suivante, ligne précédente</dd>
+        <dt><kbd>X</kbd></dt><dd>Cocher la tâche choisie (elle se ferme aussi dans Gmail)</dd>
+        <dt><kbd>Entrée</kbd></dt><dd>Ouvrir le mail ou le lien de la ligne</dd>
+        <dt><kbd>Échap</kbd></dt><dd>Quitter la sélection</dd>
+      </dl>
+    </div>
+    <div class="fenetre-pied">Les raccourcis ne marchent pas pendant que tu écris dans un champ.</div>
   </div>
 </div>
 
@@ -695,23 +861,36 @@ const MODULES = [
 ];
 let courant = "nexus";
 
+/* Sous-titre de chaque module dans la barre latérale (ordinateur) : l'essentiel en quelques mots. */
+function resumeModule(id, d) {
+  const pluriel = (n, mot) => n + " " + mot + (n > 1 ? "s" : "");
+  if (id === "nexus") return "Vue d'ensemble";
+  if (id === "hermes") return pluriel(d.hermes.taches.length, "tâche") + " · " + d.hermes.non_lus + " non lus";
+  if (id === "chronos") return d.chronos.aujourdhui.length ? pluriel(d.chronos.aujourdhui.length, "événement") + " aujourd'hui" : "Journée libre";
+  if (id === "ploutos") { const j = joursEntre(d.ploutos.point_budget_date); return j ? "Point budget J-" + j : "Point budget aujourd'hui"; }
+  if (id === "pheme") return pluriel(articles(d).length, "article");
+  if (id === "ares") return d.ares && !d.ares.erreur ? d.ares.semaine.seances + "/" + d.ares.objectif + " séances cette semaine" : "Non connecté";
+  return "";
+}
 function construireRail() {
-  const rail = $("rail");
-  rail.querySelectorAll(".onglet").forEach((o) => o.remove());
-  for (const m of MODULES) {
+  const rail = $("rail-modules");
+  rail.replaceChildren();
+  MODULES.forEach((m, i) => {
     const anneau = el("span", { class: "anneau" });
     anneau.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONES[m.id]}</svg>`;
     const badge = m.id === "hermes" ? donnees.hermes.taches.filter((t) => t.retard).length : 0;
     if (badge) anneau.append(el("span", { class: "badge", title: badge + " tâche(s) en retard" }, String(badge)));
     rail.append(el("button", {
       class: "onglet" + (m.id === "ares" && !(donnees.ares && !donnees.ares.erreur) ? " bientot" : ""), type: "button", style: `--c:var(--${m.id})`,
-      "aria-current": m.id === courant ? "page" : null, title: m.nom,
+      "aria-current": m.id === courant ? "page" : null, title: m.nom + " (touche " + (i + 1) + ")",
       onclick: () => aller(m.id),
-    }, anneau, el("span", { class: "nom" }, m.nom)));
-  }
+    }, anneau, el("span", { class: "libelle" }, el("span", { class: "nom" }, m.nom), el("span", { class: "sous" }, resumeModule(m.id, donnees))),
+      el("kbd", { "aria-hidden": "true" }, String(i + 1))));
+  });
 }
 function aller(id, depuisAdresse) {
   if (!MODULES.some((m) => m.id === id)) id = "nexus";
+  if (id !== courant) selection.index = -1;
   courant = id;
   document.documentElement.style.setProperty("--m", `var(--${id})`);
   if (!depuisAdresse) { try { history.replaceState(null, "", "#" + id); } catch {} }
@@ -730,6 +909,7 @@ function rendre() {
   vue.append(m.rendu(donnees));
   $("vue").replaceChildren(vue);
   vue.querySelectorAll("canvas[data-brouillage]").forEach(brouillage);
+  if (selection.index >= 0) choisirLigne(selection.index, false);
 }
 function etat() {
   const age = (Date.now() - new Date(donnees.maj)) / 36e5;
@@ -789,29 +969,53 @@ function vueNexus(d) {
   const [n, u] = prochain ? rebours(prochain.t) : ["", ""];
   const fil = articles(d);
 
-  const grille = el("div", { class: "grille" },
-    alertes.length ? el("div", { class: "s12" }, panneau("Attention", el("span", { class: "meta" }, alertes.length + " SIGNAL" + (alertes.length > 1 ? "S" : "")), "alerte",
-      liste(alertes, "", (a) => el("div", { class: "rangee" }, el("span", { class: "losange plein" }), el("span", { class: "principal" }, a), el("span"))))) : null,
-    el("div", { class: "s4", style: "--m:var(--chronos)" },
-      panneau("Prochain événement", el("span", { class: "meta" }, "CHRONOS"), "",
-        prochain ? el("div", null, el("div", { class: "compte-a-rebours" }, n, el("small", null, u)),
-          el("div", { class: "principal", style: "margin-top:10px" }, prochain.titre),
-          el("span", { class: "secondaire" }, prochain.jour + " · " + prochain.horaire + (prochain.lieu ? " · " + prochain.lieu : "")))
-          : el("div", { class: "vide" }, "Rien de prévu dans les 7 jours."),
-        lienModule("chronos", "Agenda"))),
-    el("div", { class: "s4", style: "--m:var(--hermes)" },
-      panneau("À traiter", el("span", { class: "compte" }, String(h.taches.length)), "",
-        liste(h.taches.slice(0, 4), "Rien à traiter.", ligneTache), lienModule("hermes", "Toutes les tâches"))),
-    el("div", { class: "s4", style: "--m:var(--pheme)" },
-      panneau("Le monde", el("span", { class: "meta" }, "PHÉMÈ"), "",
-        liste(fil.slice(0, 4), "Pas d'actualité chargée.", (a) => lien(a.lien, { class: "rangee" },
-          el("span", { class: "losange" }), el("span", { class: "principal" }, a.titre, el("span", { class: "secondaire" }, a.source)), el("span", { class: "temps" }, a.date ? quand(a.date) : ""))),
-        lienModule("pheme", "Toute l'actualité"))));
+  // Accueil en tuiles : agenda du jour, tâches, mails, budget. En mode focus, seulement l'agenda et les tâches.
+  const agenda = el("div", { class: "s6", style: "--m:var(--chronos)" },
+    panneau("Agenda du jour", el("span", { class: "meta" }, prochain ? "PROCHAIN DANS " + n + (u ? " " + u : "") : "CHRONOS"), "",
+      liste(c.aujourdhui, prochain ? "Rien aujourd'hui. Ensuite : " + prochain.titre + ", " + prochain.jour.toLowerCase() + " " + prochain.horaire + "." : "Rien de prévu dans les 7 jours.", ligneEvenement),
+      lienModule("chronos", "La semaine")));
+  const tachesTuile = el("div", { class: "s6", style: "--m:var(--hermes)" },
+    panneau("À traiter", el("span", { class: "compte" }, String(h.taches.length)), "",
+      liste(h.taches.slice(0, 6), "Rien à traiter.", ligneTache),
+      h.taches.length > 6 ? lienModule("hermes", "Les " + h.taches.length + " tâches") : lienModule("hermes", "HERMÈS")));
+  const mailsTuile = el("div", { class: "s6", style: "--m:var(--hermes)" },
+    panneau("Derniers mails", el("span", { class: "meta" }, h.non_lus + " NON LUS"), "",
+      liste(h.mails.slice(0, 5), "Boîte vide sur 3 jours.", (m) => lien(m.lien, { class: "rangee" },
+        el("span", { class: "losange" + (m.non_lu ? " plein" : "") }),
+        el("span", { class: "principal" }, el("strong", null, m.de), el("span", { class: "secondaire" }, m.objet)),
+        el("span", { class: "temps" }, quand(m.date)))),
+      lienModule("hermes", "Boîte de réception")));
+  const budgetTuile = el("div", { class: "s6", style: "--m:var(--ploutos)" }, tuileBudget(d));
+
+  const attention = alertes.length ? el("div", { class: "s12" }, panneau("Attention", el("span", { class: "meta" }, alertes.length + " SIGNAL" + (alertes.length > 1 ? "S" : "")), "alerte",
+    liste(alertes, "", (a) => el("div", { class: "rangee" }, el("span", { class: "losange plein" }), el("span", { class: "principal" }, a), el("span"))))) : null;
+
+  if (modeFocus) {
+    return el("div", null,
+      el("div", { class: "bandeau-focus" }, el("b", null, "MODE FOCUS"), "Seulement les priorités du jour.", el("button", { class: "cmd", type: "button", onclick: basculerFocus }, "QUITTER · F")),
+      el("div", { class: "accueil focus" }, gauche),
+      el("div", { class: "grille accueil-tuiles" }, attention, tachesTuile, agenda));
+  }
 
   const telescripteur = fil.length ? el("div", { class: "telescripteur" }, el("div", { class: "tag" }, "FLASH"),
     el("div", { class: "defile" }, el("div", { class: "piste" }, [...fil.slice(0, 14), ...fil.slice(0, 14)].map((a) => lien(a.lien, null, el("em", null, a.source), a.titre))))) : null;
 
-  return el("div", null, el("div", { class: "accueil" }, gauche, el("div", { class: "col-reacteur" }, centre), jauges), grille, telescripteur);
+  return el("div", null, el("div", { class: "accueil" }, gauche, el("div", { class: "col-reacteur" }, centre), jauges),
+    el("div", { class: "grille accueil-tuiles" }, attention, agenda, tachesTuile, mailsTuile, budgetTuile), telescripteur);
+}
+/* Tuile budget : le point du 5, et le mois en cours si PLOUTOS est déjà ouvert sur cet appareil. */
+function tuileBudget(d) {
+  const j = joursEntre(d.ploutos.point_budget_date);
+  const r = window.Ploutos && window.Ploutos.resume ? window.Ploutos.resume() : null;
+  const eur = (c) => new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(c / 100);
+  return panneau("Budget", el("span", { class: "meta" }, "PLOUTOS"), "",
+    el("div", { class: "chiffres" },
+      el("div", { class: "chiffre" }, el("b", null, j ? "J-" + j : "Aujourd'hui"), el("span", null, "Point budget · " + d.ploutos.point_budget)),
+      r ? el("div", { class: "chiffre" }, el("b", null, eur(r.depenses)), el("span", null, "Dépensé ce mois")) : null,
+      r ? el("div", { class: "chiffre" }, el("b", null, eur(r.revenus)), el("span", null, "Reçu ce mois")) : null,
+      r && r.aValider ? el("div", { class: "chiffre" }, el("b", { style: "color:var(--ambre)" }, String(r.aValider)), el("span", null, "Opérations à classer")) : null),
+    r ? null : el("p", { class: "secondaire", style: "margin:14px 0 0" }, "Ouvre PLOUTOS une fois pour voir ici les dépenses du mois."),
+    lienModule("ploutos", "PLOUTOS"));
 }
 function lienModule(id, texte) {
   return el("button", { class: "cmd", type: "button", style: "margin-top:14px", onclick: () => aller(id) }, texte.toUpperCase() + " →");
@@ -942,7 +1146,7 @@ function horloge24(evenements) {
   const [xa, ya] = point(cx, cy, 136, heureParis(new Date()) * 15);
   g.append(s("line", { x1: cx, y1: cy, x2: xa, y2: ya, stroke: "var(--texte)", "stroke-width": 1.5 }));
   g.append(s("circle", { cx: xa, cy: ya, r: 4, fill: "var(--texte)" }));
-  g.append(s("circle", { cx, cy, r: 62, fill: "#03060a", stroke: "var(--m)", "stroke-width": 1, "stroke-dasharray": "2 4" }));
+  g.append(s("circle", { cx, cy, r: 62, fill: "var(--fond)", stroke: "var(--m)", "stroke-width": 1, "stroke-dasharray": "2 4" }));
   g.append(s("text", { x: cx, y: cy + 4, "text-anchor": "middle", style: "font:700 26px var(--titre);fill:var(--texte)" }, fmtHeure.format(new Date())));
   g.append(s("text", { x: cx, y: cy + 22, "text-anchor": "middle", style: "font:500 8px var(--mono);letter-spacing:2px;fill:var(--m)" }, "AUJOURD'HUI"));
   return el("div", { class: "horloge-24" }, g);
@@ -1456,6 +1660,177 @@ function preparerJarvis() {
   $("jarvis-bouton").hidden = false;
 }
 
+/* ---------- Ordinateur : clavier, barre de commande, focus, thème ---------- */
+const JARVIS_EN_PAUSE = true;  // Jarvis (la voix) est en pause à la demande de Louis : ni bouton ni raccourci.
+const lirePref = (k, defaut) => { try { return localStorage.getItem(k) ?? defaut; } catch { return defaut; } };
+const garderPref = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
+let modeFocus = lirePref("nexus-focus", "0") === "1";
+const selection = { index: -1 };
+
+function appliquerTheme(theme) {
+  const clair = theme === "clair";
+  if (clair) document.documentElement.dataset.theme = "clair"; else delete document.documentElement.dataset.theme;
+  document.querySelector('meta[name="theme-color"]').content = clair ? "#eef3f7" : "#03060a";
+  $("bouton-theme").setAttribute("aria-pressed", String(clair));
+}
+function basculerTheme() {
+  const t = document.documentElement.dataset.theme === "clair" ? "sombre" : "clair";
+  garderPref("nexus-theme", t); appliquerTheme(t);
+  avis(t === "clair" ? "Thème clair." : "Thème sombre.");
+}
+function basculerFocus() {
+  modeFocus = !modeFocus; garderPref("nexus-focus", modeFocus ? "1" : "0");
+  $("bouton-focus").setAttribute("aria-pressed", String(modeFocus));
+  if (courant !== "nexus") aller("nexus"); else rendre();
+  avis(modeFocus ? "Mode focus : seulement les priorités du jour. F pour quitter." : "Mode focus désactivé.");
+}
+
+/* J / K : ligne suivante ou précédente dans la vue, X : cocher la tâche choisie, Entrée : ouvrir. */
+function lignes() { return [...$("vue").querySelectorAll(".rangee")].filter((r) => r.offsetParent && !r.closest(".palette-liste")); }
+function choisirLigne(i, defiler = true) {
+  const ls = lignes();
+  $("vue").querySelectorAll(".rangee.choisie").forEach((r) => r.classList.remove("choisie"));
+  if (!ls.length) { selection.index = -1; return; }
+  selection.index = Math.max(0, Math.min(ls.length - 1, i));
+  const r = ls[selection.index];
+  r.classList.add("choisie");
+  if (!r.matches("a, button")) r.tabIndex = -1;
+  if (defiler) { r.focus({ preventScroll: true }); r.scrollIntoView({ block: "nearest", behavior: CALME ? "auto" : "smooth" }); }
+}
+function ligneChoisie() { return selection.index >= 0 ? lignes()[selection.index] : null; }
+function cocherChoisie() {
+  const r = ligneChoisie(), c = r && r.querySelector("button.case");
+  if (c) c.click(); else avis(r ? "Cette ligne n'est pas une tâche." : "Choisis d'abord une tâche avec J ou K.", true);
+}
+function ouvrirChoisie() {
+  const r = ligneChoisie();
+  if (!r) return false;
+  const a = r.matches("a") ? r : r.querySelector("a");
+  if (a) { a.click(); return true; }
+  return false;
+}
+
+/* Barre de commande (Ctrl+K) : modules, actions, tâches, mails, événements, articles. */
+const sansAccent = (t) => (t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+const ouvrirLien = (url) => window.open(url, "_blank", "noopener");
+const palette = { choix: [], actif: 0, retour: null };
+function elementsPalette() {
+  const d = donnees, items = [];
+  MODULES.forEach((m, i) => items.push({ groupe: "Modules", titre: m.nom, sous: m.epithete, c: `var(--${m.id})`, cle: String(i + 1), faire: () => aller(m.id) }));
+  items.push(
+    { groupe: "Actions", titre: modeFocus ? "Quitter le mode focus" : "Mode focus", sous: "priorités du jour", cle: "F", faire: basculerFocus },
+    { groupe: "Actions", titre: document.documentElement.dataset.theme === "clair" ? "Thème sombre" : "Thème clair", cle: "T", faire: basculerTheme },
+    { groupe: "Actions", titre: "Actualiser les données", cle: "R", faire: () => $("rafraichir").click() },
+    { groupe: "Actions", titre: "Raccourcis clavier", cle: "?", faire: ouvrirAide },
+    { groupe: "Actions", titre: "Verrouiller la console", faire: () => $("verrouiller").click() });
+  for (const t of d.hermes.taches) items.push({ groupe: "Tâches", titre: t.titre, sous: t.quand || "sans échéance", c: t.retard ? "var(--alerte)" : "var(--hermes)", faire: () => ouvrirLien(t.lien) });
+  for (const m of d.hermes.mails) items.push({ groupe: "Mails", titre: m.objet, sous: m.de + " · " + quand(m.date), c: "var(--hermes)", faire: () => ouvrirLien(m.lien) });
+  for (const e of [...d.chronos.aujourdhui.map((x) => ({ ...x, jour: "Aujourd'hui" })), ...d.chronos.bientot])
+    items.push({ groupe: "Agenda", titre: e.titre, sous: e.jour + " · " + e.horaire, c: "var(--chronos)", faire: () => aller("chronos") });
+  for (const a of articles(d).slice(0, 40)) items.push({ groupe: "Actualité", titre: a.titre, sous: a.source, c: "var(--pheme)", faire: () => ouvrirLien(a.lien) });
+  return items;
+}
+function filtrerPalette() {
+  const q = sansAccent($("palette-saisie").value).split(/\s+/).filter(Boolean);
+  let items = elementsPalette();
+  if (q.length) items = items.filter((x) => { const t = sansAccent(x.titre + " " + (x.sous || "") + " " + x.groupe); return q.every((m) => t.includes(m)); });
+  else items = items.filter((x) => x.groupe === "Modules" || x.groupe === "Actions" || x.groupe === "Tâches");
+  palette.choix = items.slice(0, 60); palette.actif = 0;
+  dessinerPalette();
+}
+function dessinerPalette() {
+  const ul = $("palette-liste"), enfants = [];
+  let groupe = "";
+  palette.choix.forEach((x, i) => {
+    if (x.groupe !== groupe) { groupe = x.groupe; enfants.push(el("li", { class: "palette-groupe", role: "presentation" }, groupe)); }
+    enfants.push(el("li", {
+      class: "palette-choix", role: "option", id: "choix-" + i, "aria-selected": String(i === palette.actif), style: x.c ? "--c:" + x.c : null,
+      onmousemove: () => { if (palette.actif !== i) { palette.actif = i; marquerPalette(); } },
+      onclick: () => validerPalette(i),
+    }, el("span", { class: "losange" }), el("span", { class: "principal" }, x.titre, x.sous ? el("span", { class: "secondaire" }, x.sous) : null),
+      x.cle ? el("kbd", null, x.cle) : el("span")));
+  });
+  if (!palette.choix.length) enfants.push(el("li", { class: "palette-vide" }, "Rien ne correspond."));
+  ul.replaceChildren(...enfants);
+  marquerPalette();
+}
+function marquerPalette() {
+  $("palette-liste").querySelectorAll(".palette-choix").forEach((li) => li.setAttribute("aria-selected", String(li.id === "choix-" + palette.actif)));
+  $("palette-saisie").setAttribute("aria-activedescendant", palette.choix.length ? "choix-" + palette.actif : "");
+  $("choix-" + palette.actif)?.scrollIntoView({ block: "nearest" });
+}
+function ouvrirPalette() {
+  if (!donnees) return;
+  palette.retour = document.activeElement;
+  $("palette").hidden = false;
+  $("palette-saisie").value = "";
+  filtrerPalette();
+  $("palette-saisie").focus();
+}
+function fermerPalette() {
+  $("palette").hidden = true;
+  palette.retour?.focus?.({ preventScroll: true });
+}
+function validerPalette(i) {
+  const x = palette.choix[i];
+  if (!x) return;
+  fermerPalette();
+  x.faire();
+}
+function ouvrirAide() { $("aide-clavier").hidden = false; $("aide-fermer").focus(); }
+function fermerAide() { $("aide-clavier").hidden = true; }
+
+function preparerClavier() {
+  const saisie = $("palette-saisie");
+  saisie.oninput = filtrerPalette;
+  saisie.onkeydown = (ev) => {
+    if (ev.key === "ArrowDown" || ev.key === "ArrowUp") {
+      ev.preventDefault();
+      const n = palette.choix.length;
+      if (n) { palette.actif = (palette.actif + (ev.key === "ArrowDown" ? 1 : -1) + n) % n; marquerPalette(); }
+    } else if (ev.key === "Enter") { ev.preventDefault(); validerPalette(palette.actif); }
+    else if (ev.key === "Escape") { ev.preventDefault(); fermerPalette(); }
+  };
+  $("palette").onclick = (ev) => { if (ev.target === $("palette")) fermerPalette(); };
+  $("aide-clavier").onclick = (ev) => { if (ev.target === $("aide-clavier")) fermerAide(); };
+  $("aide-fermer").onclick = fermerAide;
+  $("ouvrir-palette").onclick = ouvrirPalette;
+  $("bouton-focus").onclick = basculerFocus;
+  $("bouton-theme").onclick = basculerTheme;
+  $("bouton-aide").onclick = ouvrirAide;
+  $("bouton-focus").setAttribute("aria-pressed", String(modeFocus));
+
+  addEventListener("keydown", (ev) => {
+    if ((ev.ctrlKey || ev.metaKey) && !ev.altKey && ev.key.toLowerCase() === "k") {
+      if ($("appli").hidden) return;
+      ev.preventDefault();
+      $("palette").hidden ? ouvrirPalette() : fermerPalette();
+      return;
+    }
+    if ($("appli").hidden || !$("palette").hidden || ev.ctrlKey || ev.metaKey || ev.altKey || ev.isComposing) return;
+    if (!$("aide-clavier").hidden) { if (ev.key === "Escape" || ev.key === "?") { ev.preventDefault(); fermerAide(); } return; }
+    if (/^(input|select|textarea)$/i.test(document.activeElement?.tagName || "") || document.activeElement?.isContentEditable) return;
+    if (document.querySelector(".pl-voile")) return;  // une fenêtre de PLOUTOS est ouverte
+    const listes = courant !== "ploutos";  // PLOUTOS a ses propres listes et raccourcis
+    const k = ev.key;
+    let fait = true;
+    if (k === "/") ouvrirPalette();
+    else if (k === "?") ouvrirAide();
+    else if (/^[1-9]$/.test(k) && MODULES[+k - 1]) aller(MODULES[+k - 1].id);
+    else if (k === "f" || k === "F") basculerFocus();
+    else if (k === "t" || k === "T") basculerTheme();
+    else if (k === "r" || k === "R") $("rafraichir").click();
+    else if (listes && (k === "j" || k === "J" || k === "ArrowDown" && selection.index >= 0)) choisirLigne(selection.index + 1);
+    else if (listes && (k === "k" || k === "K" || k === "ArrowUp" && selection.index >= 0)) choisirLigne(selection.index < 0 ? 0 : selection.index - 1);
+    else if (listes && (k === "x" || k === "X")) cocherChoisie();
+    else if (listes && k === "Enter" && selection.index >= 0 && !document.activeElement?.matches("a, button")) fait = ouvrirChoisie();
+    else if (k === "Escape" && selection.index >= 0) { $("vue").querySelectorAll(".rangee.choisie").forEach((r) => r.classList.remove("choisie")); selection.index = -1; }
+    else fait = false;
+    if (fait) ev.preventDefault();
+  });
+}
+appliquerTheme(lirePref("nexus-theme", "sombre"));
+
 /* ---------- Démarrage ---------- */
 function horloge() { const h = $("horloge"); if (h) h.textContent = fmtHeure.format(new Date()); }
 async function sequenceDemarrage() {
@@ -1476,7 +1851,7 @@ async function ouvrir(d) {
   $("verrou").hidden = true;
   $("appli").hidden = false;
   aller((location.hash || "#nexus").slice(1), true);
-  preparerJarvis();
+  if (!ouvrir.pret) { ouvrir.pret = true; preparerClavier(); if (!JARVIS_EN_PAUSE) preparerJarvis(); }
   await sequenceDemarrage();
 }
 async function demarrer() {
