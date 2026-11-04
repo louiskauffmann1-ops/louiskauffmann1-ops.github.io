@@ -250,6 +250,16 @@ button.case:hover::after { background: var(--m); }
 .rangee.faite .principal { text-decoration: line-through; color: var(--doux); }
 .rangee.faite { opacity: .7; transition: opacity .6s; }
 .rangee a.principal:hover { color: var(--m); }
+.grille-bilan { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 28px; }
+@media (max-width: 760px) { .grille-bilan { grid-template-columns: minmax(0, 1fr); } }
+.chiffres.quatre { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 1100px) { .chiffres.quatre { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.legende-bilan { display: flex; gap: 16px; margin-top: 6px; font: 500 10px/1 var(--mono); letter-spacing: .12em; color: var(--doux); text-transform: uppercase; }
+.legende-bilan span { display: inline-flex; align-items: center; gap: 6px; }
+.legende-bilan i { width: 10px; height: 10px; }
+.legende-bilan i.trait { height: 2px; background: var(--ambre); }
+.sous-titre { margin: 0 0 4px; font: 700 11px/1.2 var(--titre); letter-spacing: .22em; color: var(--doux); text-transform: uppercase; }
+.rangee.faite:not(.tache) { opacity: .85; }
 .fin-mail { display: flex; align-items: center; gap: 10px; }
 .actions-mail { display: flex; gap: 4px; opacity: 0; transition: opacity .15s; }
 .rangee.mail:hover .actions-mail, .rangee.mail.choisie .actions-mail, .rangee.mail:focus-within .actions-mail { opacity: 1; }
@@ -1330,7 +1340,8 @@ function vueHermes(d) {
       panneau("Briefing", el("span", { class: "meta" }, d.briefing ? d.briefing.titre.toUpperCase() : ""), "",
         liste(d.briefing ? d.briefing.mails.filter((m) => m.genre !== "securite") : [], "Rien d'important.", (m) => el("div", { class: "rangee" },
           el("span", { class: "losange" + (m.genre === "action" ? " plein" : "") }),
-          el("span", { class: "principal" }, el("strong", null, m.de + " "), m.resume, /^rien/i.test(m.action) ? null : el("span", { class: "secondaire" }, "→ " + m.action)), el("span"))))));
+          el("span", { class: "principal" }, el("strong", null, m.de + " "), m.resume, /^rien/i.test(m.action) ? null : el("span", { class: "secondaire" }, "→ " + m.action)), el("span"))))),
+    h.bilan ? el("div", { class: "s12" }, panneau("Bilan des tâches", el("span", { class: "meta" }, h.bilan.faites_total + " BOUCLÉES AU TOTAL"), "", bilanTaches(h.bilan))) : null);
 }
 
 /* --- CHRONOS --- */
@@ -1482,6 +1493,48 @@ function courbe(points) {
   const [lx, ly] = xy[xy.length - 1];
   g.append(s("circle", { cx: lx, cy: ly, r: 3, fill: "var(--m)" }));
   return g;
+}
+/* Bilan des tâches (HERMÈS) : bouclées par semaine, ajoutées (trait), délai moyen, retards. Les tâches
+   cochées sur cet appareil et pas encore remontées comptent déjà dans la semaine en cours. */
+function bilanTaches(bilan) {
+  const semaines = bilan.semaines.map((x) => ({ ...x }));
+  const enAttente = Object.keys(lireFaites()).length;
+  if (semaines.length) semaines[semaines.length - 1].faites += enAttente;
+  const cette = semaines[semaines.length - 1] || { faites: 0, ajoutees: 0 };
+  const w = 420, h = 150, bas = 118, max = Math.max(1, ...semaines.map((x) => Math.max(x.faites, x.ajoutees)));
+  const g = s("svg", { viewBox: `0 0 ${w} ${h}`, style: "width:100%;height:auto;display:block;margin-top:14px", role: "img",
+    "aria-label": "Tâches bouclées et ajoutées sur les " + semaines.length + " dernières semaines" });
+  g.append(s("line", { x1: 0, x2: w, y1: bas, y2: bas, stroke: "rgba(127,152,171,.25)" }));
+  const pas = w / Math.max(1, semaines.length);
+  semaines.forEach((x, i) => {
+    const cx = i * pas + pas / 2, derniere = i === semaines.length - 1, hb = x.faites / max * 92, ha = x.ajoutees / max * 92;
+    g.append(s("rect", { x: cx - pas * .26, y: bas - hb, width: pas * .52, height: Math.max(hb, 1), fill: derniere ? "var(--m)" : "color-mix(in srgb, var(--m) 45%, transparent)" },
+      s("title", null, `${x.faites} bouclée(s), ${x.ajoutees} ajoutée(s)`)));
+    if (x.faites) g.append(s("text", { x: cx, y: bas - Math.max(hb, ha) - 7, "text-anchor": "middle", style: "font:600 11px var(--mono);fill:" + (derniere ? "var(--m)" : "var(--doux)") }, String(x.faites)));
+    g.append(s("line", { x1: cx - pas * .34, x2: cx + pas * .34, y1: bas - ha, y2: bas - ha, stroke: "var(--ambre)", "stroke-width": 2 }));
+    const l = new Date(x.lundi + "T12:00:00Z");
+    g.append(s("text", { x: cx, y: bas + 20, "text-anchor": "middle", style: "font:400 10px var(--mono);fill:" + (derniere ? "var(--m)" : "var(--doux)") },
+      derniere ? "CETTE SEM." : l.getUTCDate() + "/" + (l.getUTCMonth() + 1)));
+  });
+  const legende = el("div", { class: "legende-bilan" },
+    el("span", null, el("i", { style: "background:var(--m)" }), "Bouclées"), el("span", null, el("i", { class: "trait" }), "Ajoutées"));
+  const delai = bilan.delai_moyen == null ? "—" : String(bilan.delai_moyen).replace(".", ",") + " j";
+  const recentes = bilan.recentes || [];
+  return el("div", { class: "grille-bilan" },
+    el("div", null,
+      el("div", { class: "chiffres quatre" },
+        el("div", { class: "chiffre" }, el("b", { style: "color:var(--m)" }, String(cette.faites)), el("span", null, "Bouclées cette semaine")),
+        el("div", { class: "chiffre" }, el("b", null, String(cette.ajoutees)), el("span", null, "Ajoutées cette semaine")),
+        el("div", { class: "chiffre" }, el("b", null, delai), el("span", null, "Délai moyen (30 j)")),
+        el("div", { class: "chiffre" }, el("b", { style: bilan.en_retard ? "color:var(--alerte)" : "" }, String(bilan.en_retard)), el("span", null, "En retard"))),
+      g, legende),
+    el("div", null,
+      el("h3", { class: "sous-titre" }, "Bouclées récemment"),
+      liste(recentes, "Rien de bouclé ces 30 derniers jours. Coche une tâche quand elle est faite.", (t) => el("div", { class: "rangee faite" },
+        el("span", { class: "case" }), el("span", { class: "principal" }, t.titre),
+        el("span", { class: "temps" }, (() => { const n = joursEntre(t.fermee); return n === 0 ? "aujourd'hui" : n === -1 ? "hier" : fmtJour.format(new Date(t.fermee + "T12:00:00")); })()))),
+      bilan.plus_ancienne ? el("p", { class: "secondaire", style: "margin:12px 0 0" },
+        "La plus ancienne encore ouverte : « " + bilan.plus_ancienne.titre + " », depuis " + bilan.plus_ancienne.depuis + " jour" + (bilan.plus_ancienne.depuis > 1 ? "s" : "") + ".") : null));
 }
 function histogramme(semaines, objectif) {
   const w = 560, h = 190, bas = 160, max = Math.max(1, ...semaines.map((x) => x.volume));
