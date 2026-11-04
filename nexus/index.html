@@ -392,6 +392,14 @@ kbd {
 .accueil-tuiles { align-items: stretch; }
 .accueil-tuiles > div > .panneau { height: 100%; }
 .accueil.focus { grid-template-columns: minmax(0, 1fr); max-width: 860px; }
+.nouvelle-tache { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; margin: 0 0 8px; }
+.nouvelle-tache input {
+  min-width: 0; padding: 8px 10px; border: 1px solid var(--ligne-forte); border-radius: 0; background: var(--surface-cmd);
+  color: var(--texte); font: 500 14px/1.2 var(--corps);
+}
+.nouvelle-tache input[type="date"] { width: 150px; font-family: var(--mono); font-size: 13px; color: var(--doux); }
+.nouvelle-tache input:focus { outline: none; border-color: var(--m); }
+@media (max-width: 520px) { .nouvelle-tache { grid-template-columns: minmax(0, 1fr) auto; } .nouvelle-tache input[type="date"] { grid-row: 2; width: auto; } }
 .bandeau-focus {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 0 18px; padding: 9px 12px;
   border: 1px dashed color-mix(in srgb, var(--nexus) 45%, transparent); color: var(--doux); font-size: 13px;
@@ -599,6 +607,7 @@ kbd {
         <dt><kbd>1</kbd>…<kbd>6</kbd></dt><dd>Changer de module (1 = NEXUS, 2 = HERMÈS…)</dd>
         <dt><kbd>F</kbd></dt><dd>Mode focus : seulement les priorités du jour</dd>
         <dt><kbd>T</kbd></dt><dd>Thème clair ou sombre</dd>
+        <dt><kbd>N</kbd></dt><dd>Nouvelle tâche (dans Ctrl+K, tape son titre puis choisis « Nouvelle tâche »)</dd>
         <dt><kbd>R</kbd></dt><dd>Actualiser les données</dd>
         <dt><kbd>?</kbd></dt><dd>Cette aide</dd>
       </dl>
@@ -976,6 +985,7 @@ function vueNexus(d) {
       lienModule("chronos", "La semaine")));
   const tachesTuile = el("div", { class: "s6", style: "--m:var(--hermes)" },
     panneau("À traiter", el("span", { class: "compte" }, String(h.taches.length)), "",
+      formNouvelleTache(),
       liste(h.taches.slice(0, 6), "Rien à traiter.", ligneTache),
       h.taches.length > 6 ? lienModule("hermes", "Les " + h.taches.length + " tâches") : lienModule("hermes", "HERMÈS")));
   const mailsTuile = el("div", { class: "s6", style: "--m:var(--hermes)" },
@@ -1041,7 +1051,7 @@ function ligneTache(t) {
   const plein = restant == null ? 0 : t.retard ? 100 : Math.max(6, 100 - restant / 14 * 100);
   return el("div", { class: "rangee tache" },
     el("button", { class: "case", type: "button", title: "Marquer comme faite", "aria-label": "Marquer comme faite : " + t.titre, onclick: (ev) => cocher(t, ev.currentTarget) }),
-    lien(t.lien, { class: "principal" }, t.titre, el("span", { class: "secondaire" }, t.quand ? t.quand.toLowerCase() : "sans échéance")),
+    (t.lien ? (...x) => lien(t.lien, ...x) : (...x) => el("span", ...x))({ class: "principal" }, t.titre, el("span", { class: "secondaire" }, (t.quand ? t.quand.toLowerCase() : "sans échéance") + (t.manuelle ? " · ajoutée à la main" : ""))),
     el("span", { class: "echeance" }, el("span", { class: "temps" }, restant == null ? "—" : t.retard ? "RETARD" : restant === 0 ? "JOUR J" : "J-" + restant),
       el("span", { class: "barre " + teinte }, el("i", { style: `width:${plein}%` }))));
 }
@@ -1051,11 +1061,81 @@ function ligneTache(t) {
 function lireFaites() { try { return JSON.parse(localStorage.getItem("nexus-faites") || "{}"); } catch { return {}; } }
 function garderFaites(f) { try { localStorage.setItem("nexus-faites", JSON.stringify(f)); } catch {} }
 function appliquerFaites(d) {
+  appliquerAjoutees(d);
   const faites = lireFaites(), ids = new Set(d.hermes.taches.map((t) => t.id));
   for (const id of Object.keys(faites)) if (!ids.has(id) || Date.now() - faites[id] > 864e5) delete faites[id];
   garderFaites(faites);
   d.hermes.taches = d.hermes.taches.filter((t) => !faites[t.id]);
   return d;
+}
+/* Ajouter une tâche à la main : la console choisit l'identifiant (m + lettres et chiffres) et lance le
+   workflow « Tâche faite » avec un titre. En attendant la mise à jour des données, la tâche est gardée
+   sur l'appareil et affichée tout de suite ; on peut même déjà la cocher. */
+function lireAjoutees() { try { return JSON.parse(localStorage.getItem("nexus-ajoutees") || "{}"); } catch { return {}; } }
+function garderAjoutees(a) { try { localStorage.setItem("nexus-ajoutees", JSON.stringify(a)); } catch {} }
+function quandLocal(echeance) {
+  if (!echeance) return "";
+  const n = joursEntre(echeance), j = fmtJour.format(new Date(echeance + "T12:00:00"));
+  return n < 0 ? "en retard (depuis " + j + ")" : n === 0 ? "aujourd'hui" : n === 1 ? "demain" : "dans " + n + " jours (" + j + ")";
+}
+function appliquerAjoutees(d) {
+  d.hermes.taches = d.hermes.taches.filter((t) => !t.attente);  // on repart des données reçues
+  const ajoutees = lireAjoutees(), ids = new Set(d.hermes.taches.map((t) => t.id));
+  for (const [id, t] of Object.entries(ajoutees)) {
+    if (ids.has(id) || Date.now() - t.cree > 864e5) { delete ajoutees[id]; continue; }
+    d.hermes.taches.push({ id, titre: t.titre, echeance: t.echeance || null, quand: quandLocal(t.echeance), retard: !!t.echeance && joursEntre(t.echeance) < 0, lien: null, manuelle: true, attente: true });
+  }
+  garderAjoutees(ajoutees);
+  d.hermes.taches.sort((a, b) => (!a.echeance - !b.echeance) || (a.echeance || "").localeCompare(b.echeance || ""));
+  return d;
+}
+async function lancerTache(inputs) {
+  if (DEMO) return;
+  const a = donnees.actions;
+  if (!a) throw new Error("Pour agir depuis la console, ajoute le jeton NEXUS_ACTIONS_TOKEN (étape 8 du guide).");
+  const r = await fetch(`https://api.github.com/repos/${a.depot}/actions/workflows/tache.yml/dispatches`, {
+    method: "POST",
+    headers: { authorization: "Bearer " + a.jeton, accept: "application/vnd.github+json", "content-type": "application/json" },
+    body: JSON.stringify({ ref: "main", inputs }),
+  });
+  if (!r.ok) throw new Error(r.status === 401 || r.status === 403 || r.status === 404
+    ? "GitHub refuse le jeton : vérifie le secret NEXUS_ACTIONS_TOKEN." : "GitHub ne répond pas (" + r.status + "). Réessaie.");
+}
+async function ajouterTache(titre, echeance) {
+  titre = (titre || "").replace(/\s+/g, " ").trim().slice(0, 200);
+  if (!titre) return false;
+  const alea = crypto.getRandomValues(new Uint8Array(6));
+  const id = "m" + Array.from(alea, (o) => o.toString(36).padStart(2, "0")).join("");
+  try {
+    await lancerTache({ email_id: id, titre, echeance: echeance || "" });
+  } catch (e) {
+    avis(e instanceof TypeError ? "Pas de connexion. Réessaie." : e.message, true);
+    return false;
+  }
+  const ajoutees = lireAjoutees(); ajoutees[id] = { titre, echeance: echeance || "", cree: Date.now() }; garderAjoutees(ajoutees);
+  appliquerAjoutees(donnees);
+  avis("Tâche ajoutée : " + titre);
+  rendre();
+  return true;
+}
+function formNouvelleTache() {
+  const titre = el("input", { type: "text", name: "titre", placeholder: "Nouvelle tâche…", "aria-label": "Nouvelle tâche", autocomplete: "off", maxlength: "200" });
+  const date = el("input", { type: "date", name: "echeance", "aria-label": "Échéance (facultative)", title: "Échéance (facultative)" });
+  const bouton = el("button", { class: "cmd", type: "submit" }, "AJOUTER");
+  const f = el("form", { class: "nouvelle-tache", onsubmit: async (ev) => {
+    ev.preventDefault();
+    if (!titre.value.trim() || bouton.disabled) return titre.focus();
+    bouton.disabled = true;
+    const ok = await ajouterTache(titre.value, date.value);
+    bouton.disabled = false;
+    if (ok) setTimeout(() => document.querySelector(".nouvelle-tache input")?.focus(), 50);
+  } }, titre, date, bouton);
+  titre.addEventListener("keydown", (ev) => { if (ev.key === "Escape") titre.blur(); });
+  return f;
+}
+function nouvelleTache() {
+  const go = () => { const i = document.querySelector(".nouvelle-tache input"); if (i) { i.scrollIntoView({ block: "center" }); i.focus(); } };
+  if (courant !== "nexus" && courant !== "hermes") { aller("hermes"); setTimeout(go, 60); } else go();
 }
 function avis(texte, erreur) {
   const a = $("avis");
@@ -1068,17 +1148,7 @@ async function cocher(t, bouton) {
   const rangee = bouton.closest(".rangee");
   bouton.disabled = true; rangee.classList.add("faite");
   try {
-    if (!DEMO) {
-      const a = donnees.actions;
-      if (!a) throw new Error("Pour cocher depuis la console, ajoute le jeton NEXUS_ACTIONS_TOKEN (étape 8 du guide).");
-      const r = await fetch(`https://api.github.com/repos/${a.depot}/actions/workflows/tache.yml/dispatches`, {
-        method: "POST",
-        headers: { authorization: "Bearer " + a.jeton, accept: "application/vnd.github+json", "content-type": "application/json" },
-        body: JSON.stringify({ ref: "main", inputs: { email_id: t.id } }),
-      });
-      if (!r.ok) throw new Error(r.status === 401 || r.status === 403 || r.status === 404
-        ? "GitHub refuse le jeton : vérifie le secret NEXUS_ACTIONS_TOKEN." : "GitHub ne répond pas (" + r.status + "). Réessaie.");
-    }
+    await lancerTache({ email_id: t.id });
     const faites = lireFaites(); faites[t.id] = Date.now(); garderFaites(faites);
     avis("Tâche faite : " + t.titre);
     setTimeout(() => { appliquerFaites(donnees); rendre(); }, 700);
@@ -1109,8 +1179,9 @@ function vueHermes(d) {
 
   return el("div", { class: "grille" },
     el("div", { class: "s5" }, panneau("À traiter", el("span", { class: "compte" }, String(h.taches.length)), "",
-      liste(h.taches, "Rien à traiter. Les nouvelles tâches arrivent avec le briefing du matin.", ligneTache),
-      el("p", { class: "secondaire", style: "margin:12px 0 0" }, "Coche une tâche quand elle est faite : elle se ferme aussi dans Gmail."))),
+      formNouvelleTache(),
+      liste(h.taches, "Rien à traiter. Ajoute une tâche ci-dessus, ou elles arriveront avec le briefing du matin.", ligneTache),
+      el("p", { class: "secondaire", style: "margin:12px 0 0" }, "Coche une tâche quand elle est faite : celles qui viennent d'un mail se ferment aussi dans Gmail."))),
     el("div", { class: "s4" }, panneau("Boîte de réception", el("span", { class: "meta" }, h.non_lus + " NON LUS"), "",
       liste(h.mails, "Boîte vide sur 3 jours.", (m) => lien(m.lien, { class: "rangee" },
         el("span", { class: "losange" + (m.non_lu ? " plein" : "") }),
@@ -1720,6 +1791,7 @@ function elementsPalette() {
   items.push(
     { groupe: "Actions", titre: modeFocus ? "Quitter le mode focus" : "Mode focus", sous: "priorités du jour", cle: "F", faire: basculerFocus },
     { groupe: "Actions", titre: document.documentElement.dataset.theme === "clair" ? "Thème sombre" : "Thème clair", cle: "T", faire: basculerTheme },
+    { groupe: "Actions", titre: "Nouvelle tâche", sous: "avec une échéance", cle: "N", faire: nouvelleTache },
     { groupe: "Actions", titre: "Actualiser les données", cle: "R", faire: () => $("rafraichir").click() },
     { groupe: "Actions", titre: "Raccourcis clavier", cle: "?", faire: ouvrirAide },
     { groupe: "Actions", titre: "Verrouiller la console", faire: () => $("verrouiller").click() });
@@ -1735,6 +1807,8 @@ function filtrerPalette() {
   let items = elementsPalette();
   if (q.length) items = items.filter((x) => { const t = sansAccent(x.titre + " " + (x.sous || "") + " " + x.groupe); return q.every((m) => t.includes(m)); });
   else items = items.filter((x) => x.groupe === "Modules" || x.groupe === "Actions" || x.groupe === "Tâches");
+  const brut = $("palette-saisie").value.trim();
+  if (brut) items.push({ groupe: "Créer", titre: "Nouvelle tâche : « " + brut + " »", sous: "sans échéance", c: "var(--hermes)", faire: () => ajouterTache(brut, "") });
   palette.choix = items.slice(0, 60); palette.actif = 0;
   dessinerPalette();
 }
@@ -1820,6 +1894,7 @@ function preparerClavier() {
     else if (k === "f" || k === "F") basculerFocus();
     else if (k === "t" || k === "T") basculerTheme();
     else if (k === "r" || k === "R") $("rafraichir").click();
+    else if (k === "n" || k === "N") nouvelleTache();
     else if (listes && (k === "j" || k === "J" || k === "ArrowDown" && selection.index >= 0)) choisirLigne(selection.index + 1);
     else if (listes && (k === "k" || k === "K" || k === "ArrowUp" && selection.index >= 0)) choisirLigne(selection.index < 0 ? 0 : selection.index - 1);
     else if (listes && (k === "x" || k === "X")) cocherChoisie();
