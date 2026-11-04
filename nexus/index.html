@@ -261,9 +261,36 @@ button.case:hover::after { background: var(--m); }
 .sous-titre { margin: 0 0 4px; font: 700 11px/1.2 var(--titre); letter-spacing: .22em; color: var(--doux); text-transform: uppercase; }
 .rangee.faite:not(.tache) { opacity: .85; }
 .fin-mail { display: flex; align-items: center; gap: 10px; }
-.actions-mail { display: flex; gap: 4px; opacity: 0; transition: opacity .15s; }
-.rangee.mail:hover .actions-mail, .rangee.mail.choisie .actions-mail, .rangee.mail:focus-within .actions-mail { opacity: 1; }
-@media (hover: none) { .actions-mail { opacity: 1; } }
+.actions-mail { display: none; gap: 4px; }
+.rangee:hover .actions-mail, .rangee.choisie .actions-mail, .rangee:focus-within .actions-mail { display: flex; }
+.texte-action { font: 600 9px/1 var(--mono); letter-spacing: .02em; }
+.edition-tache { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 6px; grid-column: 2 / 4; }
+.edition-tache input[type="text"] { grid-column: 1 / -1; width: 100%; }
+.form-brouillon > span:empty { display: block; }
+.form-evenement { display: grid; grid-template-columns: minmax(138px, 1.3fr) minmax(96px, 1fr) auto; gap: 6px; }
+.form-evenement input, .form-evenement select { min-width: 0; padding: 7px 9px; border: 1px solid var(--ligne-forte); background: var(--surface-cmd); color: var(--texte); font: 500 14px/1.2 var(--corps); }
+.form-evenement input:focus, .form-evenement select:focus { border-color: var(--m); outline: none; }
+.form-evenement input[name="titre"], .form-evenement input[name="lieu"] { grid-column: 1 / -1; }
+.form-evenement .cmd { padding: 7px 10px; }
+.edition-mail { display: grid; gap: 6px; grid-column: 2 / 4; min-width: 0; }
+.edition-mail + span { display: none; }
+.grille-plan { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 22px; }
+@media (max-width: 760px) { .grille-plan { grid-template-columns: minmax(0, 1fr); } }
+.planif-tache { cursor: grab; }
+.planif-tache.prise { background: color-mix(in srgb, var(--m) 14%, transparent); box-shadow: inset 2px 0 0 var(--m); }
+.poignee { color: var(--tres-doux); font-size: 12px; letter-spacing: -2px; }
+button.rangee.creneau { width: 100%; background: none; border: 0; border-bottom: 1px dashed var(--ligne); color: var(--texte); font: inherit; text-align: left; cursor: pointer; }
+.liste > li + li button.creneau { border-top: 0; }
+button.creneau:hover, button.creneau.survol { background: color-mix(in srgb, var(--m) 12%, transparent); box-shadow: inset 2px 0 0 var(--m); }
+button.creneau .temps { color: var(--m); }
+.duree-plan { float: right; letter-spacing: .08em; font-size: 10px; }
+.duree-plan select { margin-left: 6px; padding: 2px 4px; background: var(--surface-cmd); color: var(--texte); border: 1px solid var(--ligne-forte); font: 500 11px/1 var(--mono); }
+.edition-tache input { min-width: 0; padding: 7px 9px; border: 1px solid var(--m); background: var(--surface-cmd); color: var(--texte); font: 500 14px/1.2 var(--corps); }
+.edition-tache .cmd { padding: 6px 9px; }
+.edition-tache + span { display: none; }
+.avis .annuler { margin-left: 14px; padding: 5px 8px; gap: 8px; display: inline-flex; align-items: center; }
+.avis .annuler kbd { font-size: 9px; }
+@media (hover: none) { .actions-mail { display: flex; } }
 .action-mail { width: 26px; height: 26px; padding: 0; display: grid; place-items: center; cursor: pointer;
   background: none; border: 1px solid var(--ligne-forte); color: var(--doux); }
 .action-mail:hover, .action-mail:focus-visible { border-color: var(--m); color: var(--m); }
@@ -566,7 +593,54 @@ kbd {
   .jarvis { z-index: 35; width: 100vw; border-left: 0; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
   .j-micro { width: 112px; height: 112px; }
   .avis { bottom: calc(150px + env(safe-area-inset-bottom, 0px)); }
+
+  /* Version iPhone : barre d'onglets opaque et compacte, en-tête sous la barre d'état, gros doigts. */
+  .rail { background: color-mix(in srgb, var(--fond) 88%, transparent); -webkit-backdrop-filter: blur(14px) saturate(1.4); backdrop-filter: blur(14px) saturate(1.4); z-index: 30; }
+  .onglet .anneau { width: 32px; height: 32px; }
+  .onglet span.nom { font-size: 9.5px; letter-spacing: .12em; }
+  .bandeau { top: 0; padding-top: calc(env(safe-area-inset-top, 0px) + 8px); }
+  .tete-module { margin-top: 4px; }
+  .tete-module h1 { font-size: 34px; }
+  .tete-module .epithete { display: none; }
+  .accueil .col-reacteur { order: 0; }
+  .reacteur { max-width: 200px; }
+  .actions-mail, .rangee:hover .actions-mail, .rangee.choisie .actions-mail { display: none; }
+  .rangee .plus-actions { display: grid; }
+  .rangee { min-height: 52px; }
+  .rangee.tache, .rangee.mail { grid-template-columns: auto minmax(0, 1fr) auto auto; touch-action: pan-y; transition: transform .18s ease-out; background: var(--fond-rangee, transparent); }
+  .rangee.tache .edition-tache, .rangee.mail .edition-mail, .rangee.mail .form-brouillon { grid-column: 2 / 5; }
+  .liste > li { position: relative; }
+  button.fab { display: grid; }
+  .avis .annuler kbd { display: none; }
+  p.aide-gestes { display: block; }
 }
+.plus-actions, .fab, .aide-gestes { display: none; }
+.plus-actions { place-items: center; width: 34px; height: 34px; margin-right: -6px; background: none; border: 0; color: var(--doux); font: 700 18px/1 var(--corps); cursor: pointer; }
+.liste > li[data-geste] { background: color-mix(in srgb, var(--geste, var(--m)) 22%, transparent); }
+.liste > li[data-geste] > .rangee { --fond-rangee: var(--fond); }
+.liste > li[data-geste]::before { content: attr(data-libelle); position: absolute; top: 50%; transform: translateY(-50%); font: 700 11px/1 var(--titre); letter-spacing: .2em; color: var(--geste, var(--m)); }
+.liste > li[data-geste="droite"]::before { left: 14px; }
+.liste > li[data-geste="gauche"]::before { right: 14px; }
+.liste > li.geste-pret::before { color: var(--texte); }
+.fab {
+  position: fixed; z-index: 31; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+  width: 56px; height: 56px; place-items: center; border-radius: 50%; border: 1px solid var(--nexus); cursor: pointer;
+  background: color-mix(in srgb, var(--nexus) 22%, var(--fond)); color: var(--nexus); box-shadow: 0 0 22px color-mix(in srgb, var(--nexus) 45%, transparent);
+}
+.fab svg { width: 26px; height: 26px; stroke: currentColor; stroke-width: 2; fill: none; }
+.feuille-voile { position: fixed; inset: 0; z-index: 70; background: var(--voile); display: grid; align-items: end; animation: entrer .15s ease-out; }
+.feuille {
+  display: grid; gap: 2px; padding: 10px 12px calc(14px + env(safe-area-inset-bottom, 0px)); background: var(--surface-haute);
+  border-top: 1px solid var(--ligne-forte); max-height: 80vh; overflow-y: auto;
+}
+.feuille .titre-feuille { padding: 8px 6px 10px; font-size: 13px; color: var(--doux); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.feuille button, .feuille a { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 50px; padding: 0 10px; background: none; border: 0;
+  border-top: 1px solid var(--ligne); color: var(--texte); font: 500 16px/1.2 var(--corps); text-align: left; text-decoration: none; cursor: pointer; }
+.feuille button.danger { color: var(--alerte); }
+.feuille .annuler-feuille { justify-content: center; margin-top: 6px; border: 1px solid var(--ligne-forte); color: var(--doux); }
+.tirer { position: fixed; z-index: 40; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 8px); transform: translate(-50%, -60px); padding: 6px 12px;
+  border: 1px solid var(--nexus); background: var(--surface-haute); color: var(--nexus); font: 600 11px/1 var(--titre); letter-spacing: .16em; transition: transform .1s; pointer-events: none; }
+.aide-gestes { margin: 10px 0 0; font-size: 12px; color: var(--doux); }
 @media (max-width: 420px) {
   .accueil .col-jauges .jauges { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
@@ -590,6 +664,8 @@ kbd {
 </section>
 
 <div class="avis" id="avis" role="status" hidden></div>
+<button class="fab" id="fab" type="button" aria-label="Ajouter une tâche ou un événement"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+<div class="tirer" id="tirer" aria-hidden="true">RELÂCHE POUR ACTUALISER</div>
 <div class="demarrage" id="demarrage" hidden><pre id="journal-demarrage"></pre></div>
 
 <div class="appli" id="appli" hidden>
@@ -658,6 +734,11 @@ kbd {
       <dl>
         <dt><kbd>J</kbd> <kbd>K</kbd></dt><dd>Ligne suivante, ligne précédente</dd>
         <dt><kbd>X</kbd></dt><dd>Cocher la tâche choisie (elle se ferme aussi dans Gmail)</dd>
+        <dt><kbd>P</kbd></dt><dd>Repousser la tâche choisie d'un jour (<kbd>Maj</kbd>+<kbd>P</kbd> : d'une semaine)</dd>
+        <dt><kbd>M</kbd></dt><dd>Modifier le titre ou l'échéance de la tâche choisie</dd>
+        <dt><kbd>Ctrl</kbd><kbd>Z</kbd></dt><dd>Annuler la dernière action (quelques secondes après)</dd>
+        <dt><kbd>B</kbd></dt><dd>Brouillon de réponse au mail choisi, rédigé dans Gmail (tu relis et tu envoies)</dd>
+        <dt><kbd>C</kbd></dt><dd>Ajouter à l'agenda Google un rendez-vous tiré du mail choisi</dd>
         <dt><kbd>A</kbd></dt><dd>Faire une tâche du mail choisi (libellé « À traiter » dans Gmail)</dd>
         <dt><kbd>U</kbd></dt><dd>Marquer le mail choisi comme lu</dd>
         <dt><kbd>E</kbd></dt><dd>Archiver le mail choisi (il quitte la boîte de réception)</dd>
@@ -957,6 +1038,7 @@ function rendre() {
   construireRail();
   etat();
   majSante();
+  majPastilleEtTitre();
   const m = MODULES.find((x) => x.id === courant);
   const vue = el("div", { class: "vue" });
   if (m.id !== "nexus") vue.append(el("div", { class: "tete-module" },
@@ -966,6 +1048,20 @@ function rendre() {
   $("vue").replaceChildren(vue);
   vue.querySelectorAll("canvas[data-brouillage]").forEach(brouillage);
   if (selection.index >= 0) choisirLigne(selection.index, false);
+}
+/* Pastille sur l'icône de l'appli (iPhone, PC) et titre de l'onglet : tâches du jour ou en retard,
+   prochain rendez-vous de la journée. */
+function aFaireAujourdhui() {
+  const auj = jourParis(new Date());
+  return donnees ? donnees.hermes.taches.filter((t) => t.retard || t.echeance === auj || (t.echeance && joursEntre(t.echeance) < 0)).length : 0;
+}
+function majPastilleEtTitre() {
+  if (!donnees) return;
+  const n = aFaireAujourdhui();
+  try { if (navigator.setAppBadge) (n ? navigator.setAppBadge(n) : navigator.clearAppBadge()).catch(() => {}); } catch {}
+  const p = prochainEvenement(donnees);
+  const ajd = p && jourParis(p.t) === jourParis(new Date());
+  document.title = (n ? "(" + n + ") " : "") + "NEXUS" + (ajd ? " · " + fmtHeure.format(p.t) + " " + p.titre : "");
 }
 function etat() {
   const age = (Date.now() - new Date(donnees.maj)) / 36e5;
@@ -1096,23 +1192,95 @@ function taper(cible, texte) {
 }
 
 /* --- HERMÈS --- */
+const ACTIONS_TACHE = [
+  { action: "jour", cle: "P", titre: "Repousser d'un jour", texte: "+1J", faire: (t) => repousser(t, 1) },
+  { action: "semaine", cle: "Maj+P", titre: "Repousser d'une semaine", texte: "+7J", faire: (t) => repousser(t, 7) },
+  { action: "modifier", cle: "M", titre: "Modifier", icone: "M4 20h4L19 9l-4-4L4 16zM14 6l4 4", faire: ouvrirEdition },
+];
+function formEdition(t) {
+  const titre = el("input", { type: "text", name: "titre", value: t.titre, "aria-label": "Titre de la tâche", maxlength: "200", autocomplete: "off" });
+  const date = el("input", { type: "date", name: "echeance", value: t.echeance || "", "aria-label": "Échéance (vide : sans date)" });
+  const fermer = () => { edition = null; rendre(); };
+  const f = el("form", { class: "edition-tache", onsubmit: async (ev) => {
+      ev.preventDefault();
+      f.querySelectorAll("input, button").forEach((x) => { x.disabled = true; });
+      if (await modifierTache(t, titre.value, date.value)) { edition = null; rendre(); } else f.querySelectorAll("input, button").forEach((x) => { x.disabled = false; });
+    }, onkeydown: (ev) => { if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); fermer(); } } },
+    titre, date, el("button", { class: "cmd", type: "submit" }, "OK"), el("button", { class: "cmd", type: "button", onclick: fermer }, "ANNULER"));
+  return el("div", { class: "rangee tache", "data-tache": t.id }, el("span", { class: "case", "aria-hidden": "true" }), f, el("span"));
+}
 function ligneTache(t) {
+  if (edition === t.id) return formEdition(t);
   const restant = t.echeance ? joursEntre(t.echeance) : null;
   const teinte = t.retard ? "rouge" : restant != null && restant <= 1 ? "ambre" : "";
   const plein = restant == null ? 0 : t.retard ? 100 : Math.max(6, 100 - restant / 14 * 100);
-  return el("div", { class: "rangee tache" },
+  const actions = t.id ? ACTIONS_TACHE.map((a) => el("button", { class: "action-mail", type: "button", "data-action": a.action,
+      title: a.titre + " (" + a.cle + ")", "aria-label": a.titre + " : " + t.titre, onclick: (ev) => { ev.preventDefault(); a.faire(t); } },
+    a.icone ? s("svg", { viewBox: "0 0 24 24", "aria-hidden": "true" }, s("path", { d: a.icone })) : el("span", { class: "texte-action" }, a.texte))) : [];
+  const plus = t.id ? el("button", { class: "plus-actions", type: "button", "aria-label": "Actions : " + t.titre, onclick: () => feuilleTache(t) }, "⋯") : null;
+  return el("div", { class: "rangee tache", "data-tache": t.id || "" },
     el("button", { class: "case", type: "button", title: "Marquer comme faite", "aria-label": "Marquer comme faite : " + t.titre, onclick: (ev) => cocher(t, ev.currentTarget) }),
     (t.lien ? (...x) => lien(t.lien, ...x) : (...x) => el("span", ...x))({ class: "principal" }, t.titre, el("span", { class: "secondaire" }, (t.quand ? t.quand.toLowerCase() : "sans échéance") + (t.manuelle ? " · ajoutée à la main" : ""))),
-    el("span", { class: "echeance" }, el("span", { class: "temps" }, restant == null ? "—" : t.retard ? "RETARD" : restant === 0 ? "JOUR J" : "J-" + restant),
-      el("span", { class: "barre " + teinte }, el("i", { style: `width:${plein}%` }))));
+    el("span", { class: "fin-mail" }, el("span", { class: "actions-mail" }, actions),
+      el("span", { class: "echeance" }, el("span", { class: "temps" }, restant == null ? "—" : t.retard ? "RETARD" : restant === 0 ? "JOUR J" : "J-" + restant),
+        el("span", { class: "barre " + teinte }, el("i", { style: `width:${plein}%` })))), plus);
 }
 /* Cocher une tâche : la console lance le workflow « Tâche faite » du dépôt olympe, qui retire le
    libellé « À traiter » dans Gmail et ferme la tâche. En attendant la mise à jour des données
    (une à deux minutes), la tâche est retenue sur l'appareil et masquée. */
 function lireFaites() { try { return JSON.parse(localStorage.getItem("nexus-faites") || "{}"); } catch { return {}; } }
 function garderFaites(f) { try { localStorage.setItem("nexus-faites", JSON.stringify(f)); } catch {} }
+/* Modifier ou repousser une tâche : workflow « Tâche faite » avec action « modifier ». En attendant les
+   nouvelles données, la modification est gardée sur l'appareil (nexus-modifiees) et appliquée. */
+function lireModifiees() { try { return JSON.parse(localStorage.getItem("nexus-modifiees") || "{}"); } catch { return {}; } }
+function garderModifiees(m) { try { localStorage.setItem("nexus-modifiees", JSON.stringify(m)); } catch {} }
+function appliquerModifiees(d) {
+  const mods = lireModifiees();
+  for (const [id, m] of Object.entries(mods)) {
+    const t = d.hermes.taches.find((x) => x.id === id);
+    const recu = t && t.titre === m.titre && (t.echeance || "") === m.echeance;
+    if (!t || recu || Date.now() - m.t > 864e5) { delete mods[id]; continue; }
+    Object.assign(t, { titre: m.titre, echeance: m.echeance || null, quand: quandLocal(m.echeance), retard: !!m.echeance && joursEntre(m.echeance) < 0 });
+  }
+  garderModifiees(mods);
+  trierTaches(d);
+}
+async function modifierTache(t, titre, echeance, texte) {
+  titre = (titre || "").replace(/\s+/g, " ").trim().slice(0, 200) || t.titre;
+  echeance = echeance || "";
+  const avant = { titre: t.titre, echeance: t.echeance || "" };
+  if (titre === avant.titre && echeance === avant.echeance) return true;
+  const envoyer = (de, vers) => lancerTache({ email_id: t.id, action: "modifier", titre: vers.titre !== de.titre ? vers.titre : "",
+    echeance: vers.echeance !== de.echeance ? (vers.echeance || "-") : "" });
+  const garder = (v) => {
+    const mods = lireModifiees(); mods[t.id] = { ...v, t: Date.now() }; garderModifiees(mods);
+    const a = lireAjoutees(); if (a[t.id]) { a[t.id].titre = v.titre; a[t.id].echeance = v.echeance; garderAjoutees(a); }
+    Object.assign(t, { titre: v.titre, echeance: v.echeance || null, quand: quandLocal(v.echeance), retard: !!v.echeance && joursEntre(v.echeance) < 0 });
+    trierTaches(donnees);
+  };
+  try { await envoyer(avant, { titre, echeance }); }
+  catch (e) { avis(e instanceof TypeError ? "Pas de connexion. Réessaie." : e.message, true); return false; }
+  garder({ titre, echeance });
+  proposerAnnulation(texte || "Tâche modifiée : " + titre, async () => { await envoyer({ titre, echeance }, avant); garder(avant); avis("Modification annulée : " + avant.titre); });
+  rendre();
+  return true;
+}
+function repousser(t, jours) {
+  const base = t.echeance && joursEntre(t.echeance) > 0 ? new Date(t.echeance + "T12:00:00") : new Date();
+  base.setDate(base.getDate() + jours);
+  const iso = jourParis(base);
+  return modifierTache(t, t.titre, iso, "Repoussée " + (jours === 1 ? "d'un jour" : "d'une semaine") + " (" + quandLocal(iso) + ") : " + t.titre);
+}
+let edition = null;  // identifiant de la tâche en cours de modification
+function tacheChoisie() {
+  const r = ligneChoisie(), id = r && r.dataset.tache;
+  return id ? donnees.hermes.taches.find((t) => t.id === id) : null;
+}
+function ouvrirEdition(t) { edition = t.id; rendre(); const champ = document.querySelector(".edition-tache input"); if (champ) { champ.focus(); champ.select(); } }
 function appliquerFaites(d) {
+  appliquerEvenements(d);
   appliquerAjoutees(d);
+  appliquerModifiees(d);
   appliquerMails(d);
   const faites = lireFaites(), ids = new Set(d.hermes.taches.map((t) => t.id));
   for (const id of Object.keys(faites)) if (!ids.has(id) || Date.now() - faites[id] > 864e5) delete faites[id];
@@ -1146,6 +1314,8 @@ function appliquerAjoutees(d) {
    l'action est retenue sur l'appareil : le mail archivé disparaît, le mail lu perd son losange plein,
    la tâche apparaît tout de suite dans « À traiter ». */
 const ACTIONS_MAIL = [
+  { action: "brouillon", cle: "B", titre: "Brouillon de réponse dans Gmail", icone: "M9 8 4 12l5 4M4 12h10a6 6 0 0 1 6 6" },
+  { action: "agenda", cle: "C", titre: "Ajouter à l'agenda", icone: "M4 6h16v14H4zM4 10h16M8 3v4M16 3v4M12 13v5M9.5 15.5h5" },
   { action: "tache", cle: "A", titre: "En faire une tâche", icone: "M5 12l4 4L19 6" },
   { action: "lu", cle: "U", titre: "Marquer comme lu", icone: "M3 7l9 6 9-6M3 7v10h18V7" },
   { action: "archiver", cle: "E", titre: "Archiver", icone: "M4 8h16M6 8v11h12V8M10 12h4M3 4h18v4H3z" },
@@ -1161,17 +1331,49 @@ function appliquerMails(d) {
   h.non_lus = h.mails.filter((m) => m.non_lu).length;
   return d;
 }
+/* Brouillon de réponse (touche B) : une consigne facultative, puis le workflow « Mail » fait rédiger la
+   réponse par Haiku et la dépose en brouillon dans le fil Gmail. Une notification prévient quand elle est prête. */
+let brouillonPour = null;
+function ouvrirBrouillon(m) {
+  brouillonPour = m.id; rendre();
+  const champ = document.querySelector(".form-brouillon input"); if (champ) champ.focus();
+}
+function formBrouillon(m) {
+  const consigne = el("input", { type: "text", name: "consigne", maxlength: "500", autocomplete: "off",
+    placeholder: "Ce que tu veux répondre (facultatif) : « oui pour jeudi », « décline poliment »…", "aria-label": "Consigne pour le brouillon" });
+  const fermer = () => { brouillonPour = null; rendre(); };
+  const f = el("form", { class: "edition-tache form-brouillon", onsubmit: async (ev) => {
+      ev.preventDefault();
+      f.querySelectorAll("input, button").forEach((x) => { x.disabled = true; });
+      try {
+        await lancerTache({ email_id: m.id, action: "brouillon", titre: consigne.value.replace(/\s+/g, " ").trim() }, "mail.yml");
+        brouillonPour = null; rendre();
+        avis("Brouillon en préparation pour " + m.de + " : il sera dans Gmail d'ici une minute.");
+      } catch (e) {
+        f.querySelectorAll("input, button").forEach((x) => { x.disabled = false; });
+        avis(e instanceof TypeError ? "Pas de connexion. Réessaie." : e.message, true);
+      }
+    }, onkeydown: (ev) => { if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); fermer(); } } },
+    el("span", { class: "secondaire", style: "grid-column:1/-1;margin:0" }, "Réponse à " + m.de + " · " + m.objet),
+    consigne, el("span"), el("button", { class: "cmd", type: "submit" }, "RÉDIGER"), el("button", { class: "cmd", type: "button", onclick: fermer }, "ANNULER"));
+  return el("div", { class: "rangee mail", "data-mail": m.id }, el("span", { class: "losange plein" }), f, el("span"));
+}
 function ligneMail(m, libelles) {
+  if (brouillonPour && brouillonPour === m.id) return formBrouillon(m);
+  if (agendaPour && agendaPour === m.id) return el("div", { class: "rangee mail", "data-mail": m.id }, el("span", { class: "losange plein" }),
+    el("div", { class: "edition-mail" }, el("span", { class: "secondaire" }, "Agenda · d'après le mail de " + m.de),
+      formEvenement({ titre: m.objet, email_id: m.id }, () => { agendaPour = null; rendre(); })), el("span"));
   const suivi = m.id && Object.values(lireAjoutees()).some((t) => t.mail === m.id);
   const boutons = m.id ? ACTIONS_MAIL.filter((a) => !(a.action === "lu" && !m.non_lu) && !(a.action === "tache" && suivi)).map((a) =>
     el("button", { class: "action-mail", type: "button", "data-action": a.action, title: a.titre + " (" + a.cle + ")", "aria-label": a.titre + " : " + m.objet,
-      onclick: (ev) => { ev.preventDefault(); agirMail(m, a.action, ev.currentTarget); } },
+      onclick: (ev) => { ev.preventDefault(); a.action === "brouillon" ? ouvrirBrouillon(m) : a.action === "agenda" ? ouvrirAgendaMail(m) : agirMail(m, a.action, ev.currentTarget); } },
       s("svg", { viewBox: "0 0 24 24", "aria-hidden": "true" }, s("path", { d: a.icone })))) : [];
   return el("div", { class: "rangee mail", "data-mail": m.id || "" },
     el("span", { class: "losange" + (m.non_lu ? " plein" : "") }),
     lien(m.lien, { class: "principal" }, el("strong", null, m.de), el("span", { class: "secondaire" }, m.objet),
       libelles ? m.libelles.map((l) => el("span", { class: "etiquette" }, l)) : null),
-    el("span", { class: "fin-mail" }, el("span", { class: "actions-mail" }, boutons), el("span", { class: "temps" }, quand(m.date))));
+    el("span", { class: "fin-mail" }, el("span", { class: "actions-mail" }, boutons), el("span", { class: "temps" }, quand(m.date))),
+    m.id ? el("button", { class: "plus-actions", type: "button", "aria-label": "Actions : " + m.objet, onclick: () => feuilleMail(m) }, "⋯") : null);
 }
 async function agirMail(m, action, bouton) {
   if (bouton && bouton.disabled) return;
@@ -1187,10 +1389,18 @@ async function agirMail(m, action, bouton) {
     const ajoutees = lireAjoutees();
     ajoutees[m.id] = { titre: m.objet || "(sans objet)", echeance: "", cree: Date.now(), lien: m.lien, mail: m.id };
     garderAjoutees(ajoutees);
-    avis("Tâche créée : " + (m.objet || m.de));
+    proposerAnnulation("Tâche créée : " + (m.objet || m.de), () => oublierTache(m.id, m.objet || m.de));
   } else {
     const faits = lireMails(); faits[m.id] = { ...(faits[m.id] || {}), [action]: true, t: Date.now() }; garderMails(faits);
-    avis(action === "archiver" ? "Mail archivé : " + m.de : "Mail marqué comme lu : " + m.de);
+    const etaitNonLu = m.non_lu;
+    proposerAnnulation(action === "archiver" ? "Mail archivé : " + m.de : "Mail marqué comme lu : " + m.de, async () => {
+      await lancerTache({ email_id: m.id, action: action === "archiver" ? "desarchiver" : "non_lu", titre: "" }, "mail.yml");
+      const f = lireMails(); delete f[m.id]; garderMails(f);
+      if (action === "archiver") { remettre(donnees.hermes.mails, m); donnees.hermes.mails.sort((a, b) => b.date.localeCompare(a.date)); }
+      m.non_lu = etaitNonLu || action === "lu";
+      donnees.hermes.non_lus = donnees.hermes.mails.filter((x) => x.non_lu).length;
+      avis(action === "archiver" ? "Mail remis dans la boîte : " + m.de : "Mail marqué non lu : " + m.de);
+    });
   }
   const garde = selection.index;
   appliquerFaites(donnees); rendre();
@@ -1217,6 +1427,12 @@ async function lancerTache(inputs, workflow = "tache.yml") {
   if (!r.ok) throw new Error(r.status === 401 || r.status === 403 || r.status === 404
     ? "GitHub refuse le jeton : vérifie le secret NEXUS_ACTIONS_TOKEN." : "GitHub ne répond pas (" + r.status + "). Réessaie.");
 }
+async function oublierTache(id, titre) {
+  await lancerTache({ email_id: id, action: "supprimer" });
+  const a = lireAjoutees(); delete a[id]; garderAjoutees(a);
+  donnees.hermes.taches = donnees.hermes.taches.filter((t) => t.id !== id);
+  avis("Tâche retirée : " + titre);
+}
 async function ajouterTache(titre, echeance) {
   titre = (titre || "").replace(/\s+/g, " ").trim().slice(0, 200);
   if (!titre) return false;
@@ -1230,7 +1446,7 @@ async function ajouterTache(titre, echeance) {
   }
   const ajoutees = lireAjoutees(); ajoutees[id] = { titre, echeance: echeance || "", cree: Date.now() }; garderAjoutees(ajoutees);
   appliquerAjoutees(donnees);
-  avis("Tâche ajoutée : " + titre);
+  proposerAnnulation("Tâche ajoutée : " + titre, () => oublierTache(id, titre));
   rendre();
   return true;
 }
@@ -1288,11 +1504,27 @@ async function activerNotifs() {
     avis(e instanceof TypeError ? "Pas de connexion. Réessaie." : e.message || "Impossible d'activer les notifications.", true);
   }
 }
-function avis(texte, erreur) {
+function avis(texte, erreur, annulable) {
   const a = $("avis");
-  a.textContent = texte; a.classList.toggle("erreur", !!erreur); a.hidden = false;
-  clearTimeout(avis.minuteur); avis.minuteur = setTimeout(() => { a.hidden = true; }, 4200);
+  a.replaceChildren(texte);
+  if (annulable) a.append(el("button", { class: "cmd annuler", type: "button", onclick: annuler }, "ANNULER", el("kbd", null, "Ctrl Z")));
+  a.classList.toggle("erreur", !!erreur); a.hidden = false;
+  clearTimeout(avis.minuteur); avis.minuteur = setTimeout(() => { a.hidden = true; }, annulable ? 9000 : 4200);
 }
+/* Annuler la dernière action (Ctrl+Z ou bouton ANNULER, pendant une dizaine de secondes) : la console
+   lance l'action inverse (rouvrir, supprimer, désarchiver, marquer non lu, remettre l'ancienne échéance). */
+const annulation = { faire: null, t: 0 };
+function proposerAnnulation(texte, faire) { annulation.faire = faire; annulation.t = Date.now(); avis(texte, false, true); }
+async function annuler() {
+  const faire = annulation.faire;
+  if (!faire || Date.now() - annulation.t > 12000) return avis("Rien à annuler.", true);
+  annulation.faire = null;
+  $("avis").hidden = true;
+  try { await faire(); rendre(); }
+  catch (e) { avis(e instanceof TypeError ? "Pas de connexion : rien n'a été annulé." : e.message, true); }
+}
+function remettre(liste, x) { if (!liste.some((y) => y.id === x.id)) liste.push(x); }
+function trierTaches(d) { d.hermes.taches.sort((a, b) => (!a.echeance - !b.echeance) || (a.echeance || "").localeCompare(b.echeance || "")); }
 async function cocher(t, bouton) {
   if (bouton.disabled) return;
   if (!t.id) return avis("Données d'avant la mise à jour : touche ACTUALISER, puis réessaie.", true);
@@ -1301,7 +1533,12 @@ async function cocher(t, bouton) {
   try {
     await lancerTache({ email_id: t.id });
     const faites = lireFaites(); faites[t.id] = Date.now(); garderFaites(faites);
-    avis("Tâche faite : " + t.titre);
+    proposerAnnulation("Tâche faite : " + t.titre, async () => {
+      await lancerTache({ email_id: t.id, action: "rouvrir" });
+      const f = lireFaites(); delete f[t.id]; garderFaites(f);
+      remettre(donnees.hermes.taches, t); trierTaches(donnees);
+      avis("Tâche rouverte : " + t.titre);
+    });
     setTimeout(() => { appliquerFaites(donnees); rendre(); }, 700);
   } catch (e) {
     bouton.disabled = false; rangee.classList.remove("faite");
@@ -1332,10 +1569,11 @@ function vueHermes(d) {
     el("div", { class: "s5" }, panneau("À traiter", el("span", { class: "compte" }, String(h.taches.length)), "",
       formNouvelleTache(),
       liste(h.taches, "Rien à traiter. Ajoute une tâche ci-dessus, ou elles arriveront avec le briefing du matin.", ligneTache),
-      el("p", { class: "secondaire", style: "margin:12px 0 0" }, "Coche une tâche quand elle est faite : celles qui viennent d'un mail se ferment aussi dans Gmail."))),
+      el("p", { class: "secondaire", style: "margin:12px 0 0" }, "Coche une tâche quand elle est faite : celles qui viennent d'un mail se ferment aussi dans Gmail."),
+      el("p", { class: "aide-gestes" }, "Sur iPhone : balaie une tâche vers la droite pour la cocher, vers la gauche pour la repousser d'un jour. Sur un mail : droite archive, gauche en fait une tâche. Le bouton ⋯ montre toutes les actions."))),
     el("div", { class: "s4" }, panneau("Boîte de réception", el("span", { class: "meta" }, h.non_lus + " NON LUS"), "",
       liste(h.mails, "Boîte vide sur 3 jours.", (m) => ligneMail(m, true)),
-      el("p", { class: "secondaire", style: "margin:12px 0 0" }, "Sur une ligne choisie : A en fait une tâche, U la marque comme lue, E l'archive dans Gmail."))),
+      el("p", { class: "secondaire", style: "margin:12px 0 0" }, "Sur une ligne choisie : B prépare un brouillon de réponse, A en fait une tâche, U la marque comme lue, E l'archive."))),
     el("div", { class: "s3 pile" }, panneau("Répartition", null, "", donut, legende),
       panneau("Briefing", el("span", { class: "meta" }, d.briefing ? d.briefing.titre.toUpperCase() : ""), "",
         liste(d.briefing ? d.briefing.mails.filter((m) => m.genre !== "securite") : [], "Rien d'important.", (m) => el("div", { class: "rangee" },
@@ -1410,6 +1648,122 @@ function vueSemaine(d) {
       el("span", { class: "legende" }, [["chronos", "Agenda"], ["hermes", "Échéances"], ["ploutos", "Budget"], ["ares", "Sport"]].map(([m, l]) => el("span", null, el("i", { style: `background:var(--${m})` }), l)))),
     el("div", { class: "semaine" }, jours));
 }
+/* Ajouter à l'agenda (lot « agenda ») : workflow « Agenda » du dépôt olympe. L'événement s'affiche tout
+   de suite (gardé sur l'appareil dans nexus-evenements) en attendant la mise à jour des données. */
+function dateParis(local) {  // "AAAA-MM-JJTHH:MM" à l'heure de Paris → Date
+  const t = new Date(local + ":00Z");
+  const decalage = new Date(t.toLocaleString("en-US", { timeZone: FUSEAU })) - new Date(t.toLocaleString("en-US", { timeZone: "UTC" }));
+  return new Date(t - decalage);
+}
+const hhmm = (d) => fmtHeure.format(d);
+function lireEvenements() { try { return JSON.parse(localStorage.getItem("nexus-evenements") || "[]"); } catch { return []; } }
+function garderEvenements(e) { try { localStorage.setItem("nexus-evenements", JSON.stringify(e)); } catch {} }
+function vueEvenementLocal(e) {
+  const debut = dateParis(e.debut), fin = new Date(+debut + e.duree * 6e4);
+  return { titre: e.titre, lieu: e.lieu || "", debut: debut.toISOString(), fin: fin.toISOString(), journee_entiere: false,
+    date: e.debut.slice(0, 10), jour: fmtJour.format(debut), horaire: hhmm(debut) + " – " + hhmm(fin), attente: true, tache: !!e.tache };
+}
+function appliquerEvenements(d) {
+  const c = d.chronos, auj = jourParis(new Date());
+  c.aujourdhui = c.aujourdhui.filter((e) => !e.attente); c.bientot = c.bientot.filter((e) => !e.attente);
+  const tous = [...c.aujourdhui, ...c.bientot];
+  const restants = lireEvenements().filter((e) => {
+    const v = vueEvenementLocal(e);
+    const recu = tous.some((x) => x.titre === v.titre && x.debut && +new Date(x.debut) === +new Date(v.debut));
+    if (recu || Date.now() - e.cree > 864e5 || new Date(v.fin) < Date.now() - 36e5 * 12) return false;
+    (v.date === auj ? c.aujourdhui : c.bientot).push(v);
+    return true;
+  });
+  garderEvenements(restants);
+  c.aujourdhui.sort((a, b) => +new Date(a.debut) - +new Date(b.debut)); c.bientot.sort((a, b) => +new Date(a.debut) - +new Date(b.debut));
+  return d;
+}
+async function ajouterEvenement(e) {
+  e = { ...e, titre: (e.titre || "").replace(/\s+/g, " ").trim().slice(0, 200), duree: +e.duree || 60 };
+  if (!e.titre || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(e.debut)) { avis("Il faut un titre, une date et une heure.", true); return false; }
+  try {
+    await lancerTache({ titre: e.titre, debut: e.debut, duree: String(e.duree), lieu: e.lieu || "", email_id: e.email_id || "", tache: e.tache ? "oui" : "" }, "agenda.yml");
+  } catch (er) { avis(er instanceof TypeError ? "Pas de connexion. Réessaie." : er.message, true); return false; }
+  garderEvenements([...lireEvenements(), { ...e, cree: Date.now() }]);
+  appliquerEvenements(donnees);
+  const v = vueEvenementLocal(e);
+  avis("Ajouté à l'agenda : " + v.titre + ", " + v.jour.toLowerCase() + " " + v.horaire);
+  rendre();
+  return true;
+}
+function formEvenement(init, apres) {
+  const demain = new Date(); demain.setDate(demain.getDate() + 1);
+  const titre = el("input", { type: "text", name: "titre", value: init.titre || "", placeholder: "Titre de l'événement", "aria-label": "Titre de l'événement", maxlength: "200", autocomplete: "off" });
+  const date = el("input", { type: "date", name: "date", value: init.date || jourParis(demain), "aria-label": "Date" });
+  const heure = el("input", { type: "time", name: "heure", value: init.heure || "09:00", step: "900", "aria-label": "Heure" });
+  const duree = el("select", { name: "duree", "aria-label": "Durée" }, [15, 30, 45, 60, 90, 120, 180].map((m) =>
+    el("option", { value: String(m), selected: m === (init.duree || 60) ? "" : null }, m < 60 ? m + " min" : (m / 60 + " h").replace(".5", " h 30").replace(" h h", " h"))));
+  const lieu = el("input", { type: "text", name: "lieu", placeholder: "Lieu (facultatif)", "aria-label": "Lieu", maxlength: "200", autocomplete: "off" });
+  const f = el("form", { class: "form-evenement", onsubmit: async (ev) => {
+      ev.preventDefault();
+      f.querySelectorAll("input, select, button").forEach((x) => { x.disabled = true; });
+      const ok = await ajouterEvenement({ titre: titre.value, debut: date.value + "T" + heure.value, duree: duree.value, lieu: lieu.value, email_id: init.email_id });
+      f.querySelectorAll("input, select, button").forEach((x) => { x.disabled = false; });
+      if (ok) { titre.value = ""; lieu.value = ""; if (apres) apres(); }
+    }, onkeydown: (ev) => { if (ev.key === "Escape" && apres) { ev.preventDefault(); ev.stopPropagation(); apres(); } } },
+    titre, date, heure, duree, lieu, el("button", { class: "cmd", type: "submit" }, "AJOUTER"),
+    apres ? el("button", { class: "cmd", type: "button", onclick: apres }, "ANNULER") : null);
+  return f;
+}
+let agendaPour = null;  // mail en cours d'ajout à l'agenda (touche C)
+function ouvrirAgendaMail(m) { agendaPour = m.id; brouillonPour = null; rendre(); const c = document.querySelector(".rangee.mail .form-evenement input"); if (c) c.focus(); }
+function nouvelEvenement() {
+  aller("chronos");
+  setTimeout(() => { const c = document.querySelector("#nouvel-evenement input"); if (c) { c.focus(); c.scrollIntoView({ block: "center" }); } }, 60);
+}
+
+/* Planifier la journée : les créneaux libres d'aujourd'hui (8 h à 21 h, au moins 30 min) ; on y pose une
+   tâche, en la glissant ou en la choisissant puis en touchant le créneau, et un événement la réserve. */
+let tachePlanifiee = null, dureePlan = 60;
+function creneauxLibres(d) {
+  const auj = jourParis(new Date());
+  const ouverture = dateParis(auj + "T08:00"), fermeture = dateParis(auj + "T21:00");
+  let depart = new Date(Math.max(+ouverture, Math.ceil(Date.now() / 18e5) * 18e5));
+  const pris = d.chronos.aujourdhui.filter((e) => !e.journee_entiere && e.debut && e.fin)
+    .map((e) => [new Date(e.debut), new Date(e.fin)]).sort((a, b) => a[0] - b[0]);
+  const libres = [];
+  for (const [a, b] of pris) {
+    if (a - depart >= 18e5) libres.push([depart, a]);
+    if (b > depart) depart = b;
+  }
+  if (fermeture - depart >= 18e5) libres.push([depart, fermeture]);
+  return libres.filter(([a, b]) => b > a && a < fermeture);
+}
+function planifier(t, [a, b]) {
+  const duree = Math.min(dureePlan, Math.round((b - a) / 6e4));
+  const debut = jourParis(a) + "T" + hhmm(a);
+  tachePlanifiee = null;
+  return ajouterEvenement({ titre: t.titre, debut, duree, email_id: t.lien && /^[A-Za-z0-9]+$/.test(t.id) && !t.manuelle ? t.id : "", tache: true });
+}
+function panneauPlanifier(d) {
+  const libres = creneauxLibres(d);
+  const taches = d.hermes.taches.slice(0, 8);
+  const longueur = ([a, b]) => { const m = Math.round((b - a) / 6e4); return m >= 60 ? Math.floor(m / 60) + " h" + (m % 60 ? " " + String(m % 60).padStart(2, "0") : "") : m + " min"; };
+  const choixDuree = el("select", { "aria-label": "Durée réservée", onchange: (ev) => { dureePlan = +ev.target.value; } },
+    [30, 60, 90, 120].map((m) => el("option", { value: String(m), selected: m === dureePlan ? "" : null }, m < 60 ? m + " min" : (m / 60 + " h").replace(".5 h", " h 30"))));
+  const colTaches = liste(taches, "Aucune tâche ouverte.", (t) => el("div", { class: "rangee planif-tache" + (tachePlanifiee === t.id ? " prise" : ""), draggable: "true",
+      ondragstart: (ev) => { ev.dataTransfer.setData("text/plain", t.id); ev.dataTransfer.effectAllowed = "copy"; },
+      onclick: () => { tachePlanifiee = tachePlanifiee === t.id ? null : t.id; rendre(); } },
+    el("span", { class: "poignee", "aria-hidden": "true" }, "⋮⋮"), el("span", { class: "principal" }, t.titre, el("span", { class: "secondaire" }, t.quand ? t.quand.toLowerCase() : "sans échéance")), el("span")));
+  const colCreneaux = liste(libres, "Plus de créneau libre aujourd'hui (8 h à 21 h).", (c) => {
+    const poser = (id) => { const t = d.hermes.taches.find((x) => x.id === id); if (t) planifier(t, c); };
+    return el("button", { class: "rangee creneau", type: "button",
+        ondragover: (ev) => { ev.preventDefault(); ev.currentTarget.classList.add("survol"); },
+        ondragleave: (ev) => ev.currentTarget.classList.remove("survol"),
+        ondrop: (ev) => { ev.preventDefault(); ev.currentTarget.classList.remove("survol"); poser(ev.dataTransfer.getData("text/plain")); },
+        onclick: () => tachePlanifiee ? poser(tachePlanifiee) : avis("Choisis d'abord une tâche à gauche, ou glisse-la ici.", true) },
+      el("span", { class: "horaire" }, hhmm(c[0]) + " – " + hhmm(c[1])), el("span", { class: "principal" }, longueur(c) + " libres"), el("span", { class: "temps" }, "POSER ICI"));
+  });
+  return panneau("Planifier la journée", el("span", { class: "meta" }, "GLISSE UNE TÂCHE SUR UN CRÉNEAU"), "",
+    el("div", { class: "grille-plan" },
+      el("div", null, el("h3", { class: "sous-titre" }, "Tâches"), colTaches),
+      el("div", null, el("h3", { class: "sous-titre" }, "Créneaux libres aujourd'hui", el("span", { class: "duree-plan" }, "Réserver ", choixDuree)), colCreneaux)));
+}
 function vueChronos(d) {
   const c = d.chronos;
   return el("div", { class: "grille" },
@@ -1417,6 +1771,8 @@ function vueChronos(d) {
     el("div", { class: "s7 pile" }, panneau("Aujourd'hui", el("span", { class: "compte" }, String(c.aujourdhui.length)), "",
       liste(c.aujourdhui, "Rien dans l'agenda aujourd'hui.", ligneEvenement)),
       (c.conflits || []).length ? panneau("Conflits", null, "alerte", liste(c.conflits, "", (x) => el("div", { class: "rangee" }, el("span", { class: "losange plein" }), el("span", null, x), el("span")))) : null),
+    el("div", { class: "s7" }, panneauPlanifier(d)),
+    el("div", { class: "s5", id: "nouvel-evenement" }, panneau("Nouvel événement", el("span", { class: "meta" }, "AGENDA GOOGLE"), "", formEvenement({}))),
     el("div", { class: "s12", id: "semaine" }, vueSemaine(d)));
 }
 
@@ -2011,6 +2367,8 @@ function elementsPalette() {
     { groupe: "Actions", titre: document.documentElement.dataset.theme === "clair" ? "Thème sombre" : "Thème clair", cle: "T", faire: basculerTheme },
     { groupe: "Actions", titre: "Vue semaine", sous: "agenda, échéances, budget, sport", cle: "S", faire: allerSemaine },
     { groupe: "Actions", titre: "Nouvelle tâche", sous: "avec une échéance", cle: "N", faire: nouvelleTache },
+    { groupe: "Actions", titre: "Nouvel événement", sous: "dans l'agenda Google", faire: nouvelEvenement },
+    { groupe: "Actions", titre: "Planifier la journée", sous: "poser des tâches sur les créneaux libres", faire: () => { aller("chronos"); setTimeout(() => document.querySelector(".grille-plan")?.scrollIntoView({ block: "center" }), 60); } },
     { groupe: "Actions", titre: "Actualiser les données", cle: "R", faire: () => $("rafraichir").click() },
     { groupe: "Actions", titre: notifsActives() ? "Réactiver les notifications" : "Activer les notifications", sous: "iPhone et PC", faire: activerNotifs },
     { groupe: "Actions", titre: "Santé du système", sous: libelleSante(bilanSante()), cle: "H", faire: ouvrirSante },
@@ -2108,6 +2466,114 @@ function ouvrirSante() {
   $("fenetre-sante").hidden = false; $("sante-fermer").focus();
 }
 function fermerSante() { $("fenetre-sante").hidden = true; }
+/* Version iPhone : feuille d'actions (bouton ⋯), gestes de balayage sur les lignes (droite : fait ou
+   archiver ; gauche : +1 jour ou en faire une tâche), bouton + flottant, tirer vers le bas pour actualiser. */
+function feuille(titre, actions) {
+  const fermer = () => voile.remove();
+  const voile = el("div", { class: "feuille-voile", onclick: (ev) => { if (ev.target === voile) fermer(); } },
+    el("div", { class: "feuille", role: "dialog", "aria-modal": "true", "aria-label": titre },
+      el("div", { class: "titre-feuille" }, titre),
+      actions.filter(Boolean).map((a) => a.lien ? lien(a.lien, { onclick: fermer }, a.texte)
+        : el("button", { type: "button", class: a.danger ? "danger" : "", onclick: () => { fermer(); a.faire(); } }, a.texte)),
+      el("button", { class: "annuler-feuille", type: "button", onclick: fermer }, "Fermer")));
+  document.body.append(voile);
+}
+function feuilleTache(t) {
+  feuille(t.titre, [
+    { texte: "✓  Fait", faire: () => { const b = document.querySelector(`.rangee.tache[data-tache="${t.id}"] button.case`); if (b) b.click(); } },
+    { texte: "+1 jour", faire: () => repousser(t, 1) },
+    { texte: "+1 semaine", faire: () => repousser(t, 7) },
+    { texte: "Modifier le titre ou l'échéance", faire: () => ouvrirEdition(t) },
+    { texte: "Planifier aujourd'hui (CHRONOS)", faire: () => { tachePlanifiee = t.id; aller("chronos"); setTimeout(() => document.querySelector(".grille-plan")?.scrollIntoView({ block: "center" }), 60); } },
+    t.lien ? { texte: "Ouvrir le mail", lien: t.lien } : null,
+  ]);
+}
+function feuilleMail(m) {
+  const suivi = Object.values(lireAjoutees()).some((t) => t.mail === m.id);
+  feuille(m.de + " · " + m.objet, [
+    { texte: "Ouvrir dans Gmail", lien: m.lien },
+    { texte: "Brouillon de réponse", faire: () => ouvrirBrouillon(m) },
+    { texte: "Ajouter à l'agenda", faire: () => ouvrirAgendaMail(m) },
+    suivi ? null : { texte: "En faire une tâche", faire: () => agirMail(m, "tache") },
+    m.non_lu ? { texte: "Marquer comme lu", faire: () => agirMail(m, "lu") } : null,
+    { texte: "Archiver", faire: () => agirMail(m, "archiver"), danger: true },
+  ]);
+}
+function gesteSur(r, sens) {
+  if (r.dataset.tache) {
+    const t = donnees.hermes.taches.find((x) => x.id === r.dataset.tache);
+    if (!t) return;
+    if (sens === "droite") r.querySelector("button.case")?.click(); else repousser(t, 1);
+  } else if (r.dataset.mail) {
+    const m = donnees.hermes.mails.find((x) => x.id === r.dataset.mail);
+    if (!m) return;
+    if (sens === "droite") agirMail(m, "archiver");
+    else if (!Object.values(lireAjoutees()).some((t) => t.mail === m.id)) agirMail(m, "tache");
+    else avis("Ce mail est déjà une tâche.", true);
+  }
+}
+function preparerTactile() {
+  const vue = $("vue");
+  let r = null, x0 = 0, y0 = 0, dx = 0, glisse = false, bloquerClic = 0;
+  const libelles = (ligne, sens) => ligne.dataset.tache ? (sens === "droite" ? ["FAIT", "var(--ploutos)"] : ["+1 JOUR", "var(--ambre)"])
+    : (sens === "droite" ? ["ARCHIVER", "var(--alerte)"] : ["TÂCHE", "var(--hermes)"]);
+  const remettre = () => {
+    if (!r) return;
+    r.style.transform = ""; const li = r.parentElement;
+    if (li) { delete li.dataset.geste; li.classList.remove("geste-pret"); li.style.removeProperty("--geste"); }
+  };
+  vue.addEventListener("touchstart", (ev) => {
+    const ligne = ev.target.closest(".rangee.tache[data-tache], .rangee.mail[data-mail]");
+    if (!ligne || !ligne.dataset.tache && !ligne.dataset.mail || ev.touches.length > 1 || ev.target.closest("input, select, form, .plus-actions")) { r = null; return; }
+    if (!matchMedia("(max-width: 760px)").matches) { r = null; return; }
+    r = ligne; x0 = ev.touches[0].clientX; y0 = ev.touches[0].clientY; dx = 0; glisse = false;
+  }, { passive: true });
+  vue.addEventListener("touchmove", (ev) => {
+    if (!r) return;
+    const t = ev.touches[0], ddx = t.clientX - x0, ddy = t.clientY - y0;
+    if (!glisse) {
+      if (Math.abs(ddy) > 10 && Math.abs(ddy) > Math.abs(ddx)) { r = null; return; }
+      if (Math.abs(ddx) < 12) return;
+      glisse = true;
+    }
+    dx = Math.max(-150, Math.min(150, ddx));
+    const sens = dx > 0 ? "droite" : "gauche", [texte, teinte] = libelles(r, sens), li = r.parentElement;
+    r.style.transform = `translateX(${dx}px)`;
+    li.dataset.geste = sens; li.dataset.libelle = texte; li.style.setProperty("--geste", teinte);
+    li.classList.toggle("geste-pret", Math.abs(dx) > 96);
+  }, { passive: true });
+  const fin = () => {
+    if (!r) return;
+    const ligne = r, fait = glisse && Math.abs(dx) > 96, sens = dx > 0 ? "droite" : "gauche";
+    if (glisse) bloquerClic = Date.now();
+    remettre(); r = null; glisse = false;
+    if (fait) gesteSur(ligne, sens);
+  };
+  vue.addEventListener("touchend", fin); vue.addEventListener("touchcancel", () => { remettre(); r = null; });
+  // Un balayage ne doit pas ouvrir le lien de la ligne.
+  vue.addEventListener("click", (ev) => { if (ev.isTrusted && Date.now() - bloquerClic < 400 && ev.target.closest(".rangee")) { ev.preventDefault(); ev.stopPropagation(); } }, true);
+
+  // Tirer vers le bas, en haut de la page, pour actualiser (l'appli installée n'a pas ce geste d'elle-même).
+  let yTirer = null, tire = 0;
+  addEventListener("touchstart", (ev) => { yTirer = scrollY <= 0 && !ev.target.closest(".feuille, .fenetre, .rangee") ? ev.touches[0].clientY : null; tire = 0; }, { passive: true });
+  addEventListener("touchmove", (ev) => {
+    if (yTirer == null) return;
+    tire = Math.max(0, ev.touches[0].clientY - yTirer);
+    $("tirer").style.transform = `translate(-50%, ${Math.min(tire, 110) - 60}px)`;
+    $("tirer").textContent = tire > 90 ? "RELÂCHE POUR ACTUALISER" : "TIRE POUR ACTUALISER";
+  }, { passive: true });
+  addEventListener("touchend", () => {
+    if (yTirer == null) return;
+    $("tirer").style.transform = "";
+    if (tire > 90) $("rafraichir").click();
+    yTirer = null;
+  });
+  $("fab").onclick = () => feuille("Ajouter", [
+    { texte: "Nouvelle tâche", faire: nouvelleTache },
+    { texte: "Nouvel événement", faire: nouvelEvenement },
+    { texte: "Planifier la journée", faire: () => { aller("chronos"); setTimeout(() => document.querySelector(".grille-plan")?.scrollIntoView({ block: "center" }), 60); } },
+  ]);
+}
 function ouvrirAide() { $("aide-clavier").hidden = false; $("aide-fermer").focus(); }
 function fermerAide() { $("aide-clavier").hidden = true; }
 
@@ -2137,6 +2603,10 @@ function preparerClavier() {
   $("bouton-focus").setAttribute("aria-pressed", String(modeFocus));
 
   addEventListener("keydown", (ev) => {
+    if ((ev.ctrlKey || ev.metaKey) && !ev.altKey && !ev.shiftKey && ev.key.toLowerCase() === "z" && !$("appli").hidden
+        && !/^(input|select|textarea)$/i.test(document.activeElement?.tagName || "") && annulation.faire) {
+      ev.preventDefault(); annuler(); return;
+    }
     if ((ev.ctrlKey || ev.metaKey) && !ev.altKey && ev.key.toLowerCase() === "k") {
       if ($("appli").hidden) return;
       ev.preventDefault();
@@ -2163,6 +2633,10 @@ function preparerClavier() {
     else if (listes && (k === "j" || k === "J" || k === "ArrowDown" && selection.index >= 0)) choisirLigne(selection.index + 1);
     else if (listes && (k === "k" || k === "K" || k === "ArrowUp" && selection.index >= 0)) choisirLigne(selection.index < 0 ? 0 : selection.index - 1);
     else if (listes && (k === "x" || k === "X")) cocherChoisie();
+    else if (listes && (k === "p" || k === "P")) { const t = tacheChoisie(); t ? repousser(t, ev.shiftKey ? 7 : 1) : avis("Choisis d'abord une tâche avec J ou K.", true); }
+    else if (listes && (k === "m" || k === "M")) { const t = tacheChoisie(); t ? ouvrirEdition(t) : avis("Choisis d'abord une tâche avec J ou K.", true); }
+    else if (listes && (k === "b" || k === "B")) agirMailChoisi("brouillon");
+    else if (listes && (k === "c" || k === "C")) agirMailChoisi("agenda");
     else if (listes && (k === "a" || k === "A")) agirMailChoisi("tache");
     else if (listes && (k === "u" || k === "U")) agirMailChoisi("lu");
     else if (listes && (k === "e" || k === "E")) agirMailChoisi("archiver");
@@ -2194,11 +2668,12 @@ async function ouvrir(d) {
   $("verrou").hidden = true;
   $("appli").hidden = false;
   aller((location.hash || "#nexus").slice(1), true);
-  if (!ouvrir.pret) { ouvrir.pret = true; preparerClavier(); if (!JARVIS_EN_PAUSE) preparerJarvis(); }
+  if (!ouvrir.pret) { ouvrir.pret = true; preparerClavier(); preparerTactile(); if (!JARVIS_EN_PAUSE) preparerJarvis(); }
   await sequenceDemarrage();
 }
 async function demarrer() {
   setInterval(horloge, 10000);
+  setInterval(majPastilleEtTitre, 60000);
   reacteur($("reacteur-verrou"));
   requestAnimationFrame(boucle);
   if (DEMO) { $("verrouiller").hidden = true; return ouvrir(DEMO); }
