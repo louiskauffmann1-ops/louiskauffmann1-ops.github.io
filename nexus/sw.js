@@ -1,5 +1,5 @@
 // NEXUS : garde la page en cache pour l'ouvrir hors connexion, toujours en version fraîche si le réseau répond.
-const CACHE = "nexus-v12";
+const CACHE = "nexus-v13";
 const FICHIERS = ["./", "index.html", "manifest.webmanifest", "icone.svg", "icone-180.png", "icone-192.png", "icone-512.png",
   "ploutos.css?v=5", "ploutos-moteur.js?v=5", "ploutos-coffre.js?v=5", "ploutos.js?v=5"];
 
@@ -29,9 +29,11 @@ self.addEventListener("fetch", (e) => {
 self.addEventListener("push", (e) => {
   let n = { titre: "NEXUS", corps: "", url: "./" };
   try { n = { ...n, ...e.data.json() }; } catch {}
-  e.waitUntil(self.registration.showNotification(n.titre, {
+  const pastille = typeof n.pastille === "number" && self.navigator.setAppBadge
+    ? (n.pastille ? self.navigator.setAppBadge(n.pastille) : self.navigator.clearAppBadge()).catch(() => {}) : Promise.resolve();
+  e.waitUntil(Promise.all([pastille, self.registration.showNotification(n.titre, {
     body: n.corps, icon: "icone-192.png", badge: "icone-192.png", tag: n.tag || undefined, data: { url: n.url || "./" },
-  }));
+  })]));
 });
 self.addEventListener("notificationclick", (e) => {
   e.notification.close();

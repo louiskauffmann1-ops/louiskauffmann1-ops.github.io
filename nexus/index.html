@@ -262,7 +262,15 @@ button.case:hover::after { background: var(--m); }
 .rangee.faite:not(.tache) { opacity: .85; }
 .fin-mail { display: flex; align-items: center; gap: 10px; }
 .actions-mail { display: flex; gap: 4px; opacity: 0; transition: opacity .15s; }
-.rangee.mail:hover .actions-mail, .rangee.mail.choisie .actions-mail, .rangee.mail:focus-within .actions-mail { opacity: 1; }
+.rangee:hover .actions-mail, .rangee.choisie .actions-mail, .rangee:focus-within .actions-mail { opacity: 1; }
+.texte-action { font: 600 9px/1 var(--mono); letter-spacing: .02em; }
+.edition-tache { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 6px; grid-column: 2 / 4; }
+.edition-tache input[type="text"] { grid-column: 1 / -1; width: 100%; }
+.edition-tache input { min-width: 0; padding: 7px 9px; border: 1px solid var(--m); background: var(--surface-cmd); color: var(--texte); font: 500 14px/1.2 var(--corps); }
+.edition-tache .cmd { padding: 6px 9px; }
+.edition-tache + span { display: none; }
+.avis .annuler { margin-left: 14px; padding: 5px 8px; gap: 8px; display: inline-flex; align-items: center; }
+.avis .annuler kbd { font-size: 9px; }
 @media (hover: none) { .actions-mail { opacity: 1; } }
 .action-mail { width: 26px; height: 26px; padding: 0; display: grid; place-items: center; cursor: pointer;
   background: none; border: 1px solid var(--ligne-forte); color: var(--doux); }
@@ -658,6 +666,9 @@ kbd {
       <dl>
         <dt><kbd>J</kbd> <kbd>K</kbd></dt><dd>Ligne suivante, ligne précédente</dd>
         <dt><kbd>X</kbd></dt><dd>Cocher la tâche choisie (elle se ferme aussi dans Gmail)</dd>
+        <dt><kbd>P</kbd></dt><dd>Repousser la tâche choisie d'un jour (<kbd>Maj</kbd>+<kbd>P</kbd> : d'une semaine)</dd>
+        <dt><kbd>M</kbd></dt><dd>Modifier le titre ou l'échéance de la tâche choisie</dd>
+        <dt><kbd>Ctrl</kbd><kbd>Z</kbd></dt><dd>Annuler la dernière action (quelques secondes après)</dd>
         <dt><kbd>A</kbd></dt><dd>Faire une tâche du mail choisi (libellé « À traiter » dans Gmail)</dd>
         <dt><kbd>U</kbd></dt><dd>Marquer le mail choisi comme lu</dd>
         <dt><kbd>E</kbd></dt><dd>Archiver le mail choisi (il quitte la boîte de réception)</dd>
@@ -957,6 +968,7 @@ function rendre() {
   construireRail();
   etat();
   majSante();
+  majPastilleEtTitre();
   const m = MODULES.find((x) => x.id === courant);
   const vue = el("div", { class: "vue" });
   if (m.id !== "nexus") vue.append(el("div", { class: "tete-module" },
@@ -966,6 +978,20 @@ function rendre() {
   $("vue").replaceChildren(vue);
   vue.querySelectorAll("canvas[data-brouillage]").forEach(brouillage);
   if (selection.index >= 0) choisirLigne(selection.index, false);
+}
+/* Pastille sur l'icône de l'appli (iPhone, PC) et titre de l'onglet : tâches du jour ou en retard,
+   prochain rendez-vous de la journée. */
+function aFaireAujourdhui() {
+  const auj = jourParis(new Date());
+  return donnees ? donnees.hermes.taches.filter((t) => t.retard || t.echeance === auj || (t.echeance && joursEntre(t.echeance) < 0)).length : 0;
+}
+function majPastilleEtTitre() {
+  if (!donnees) return;
+  const n = aFaireAujourdhui();
+  try { if (navigator.setAppBadge) (n ? navigator.setAppBadge(n) : navigator.clearAppBadge()).catch(() => {}); } catch {}
+  const p = prochainEvenement(donnees);
+  const ajd = p && jourParis(p.t) === jourParis(new Date());
+  document.title = (n ? "(" + n + ") " : "") + "NEXUS" + (ajd ? " · " + fmtHeure.format(p.t) + " " + p.titre : "");
 }
 function etat() {
   const age = (Date.now() - new Date(donnees.maj)) / 36e5;
@@ -1096,23 +1122,93 @@ function taper(cible, texte) {
 }
 
 /* --- HERMÈS --- */
+const ACTIONS_TACHE = [
+  { action: "jour", cle: "P", titre: "Repousser d'un jour", texte: "+1J", faire: (t) => repousser(t, 1) },
+  { action: "semaine", cle: "Maj+P", titre: "Repousser d'une semaine", texte: "+7J", faire: (t) => repousser(t, 7) },
+  { action: "modifier", cle: "M", titre: "Modifier", icone: "M4 20h4L19 9l-4-4L4 16zM14 6l4 4", faire: ouvrirEdition },
+];
+function formEdition(t) {
+  const titre = el("input", { type: "text", name: "titre", value: t.titre, "aria-label": "Titre de la tâche", maxlength: "200", autocomplete: "off" });
+  const date = el("input", { type: "date", name: "echeance", value: t.echeance || "", "aria-label": "Échéance (vide : sans date)" });
+  const fermer = () => { edition = null; rendre(); };
+  const f = el("form", { class: "edition-tache", onsubmit: async (ev) => {
+      ev.preventDefault();
+      f.querySelectorAll("input, button").forEach((x) => { x.disabled = true; });
+      if (await modifierTache(t, titre.value, date.value)) { edition = null; rendre(); } else f.querySelectorAll("input, button").forEach((x) => { x.disabled = false; });
+    }, onkeydown: (ev) => { if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); fermer(); } } },
+    titre, date, el("button", { class: "cmd", type: "submit" }, "OK"), el("button", { class: "cmd", type: "button", onclick: fermer }, "ANNULER"));
+  return el("div", { class: "rangee tache", "data-tache": t.id }, el("span", { class: "case", "aria-hidden": "true" }), f, el("span"));
+}
 function ligneTache(t) {
+  if (edition === t.id) return formEdition(t);
   const restant = t.echeance ? joursEntre(t.echeance) : null;
   const teinte = t.retard ? "rouge" : restant != null && restant <= 1 ? "ambre" : "";
   const plein = restant == null ? 0 : t.retard ? 100 : Math.max(6, 100 - restant / 14 * 100);
-  return el("div", { class: "rangee tache" },
+  const actions = t.id ? ACTIONS_TACHE.map((a) => el("button", { class: "action-mail", type: "button", "data-action": a.action,
+      title: a.titre + " (" + a.cle + ")", "aria-label": a.titre + " : " + t.titre, onclick: (ev) => { ev.preventDefault(); a.faire(t); } },
+    a.icone ? s("svg", { viewBox: "0 0 24 24", "aria-hidden": "true" }, s("path", { d: a.icone })) : el("span", { class: "texte-action" }, a.texte))) : [];
+  return el("div", { class: "rangee tache", "data-tache": t.id || "" },
     el("button", { class: "case", type: "button", title: "Marquer comme faite", "aria-label": "Marquer comme faite : " + t.titre, onclick: (ev) => cocher(t, ev.currentTarget) }),
     (t.lien ? (...x) => lien(t.lien, ...x) : (...x) => el("span", ...x))({ class: "principal" }, t.titre, el("span", { class: "secondaire" }, (t.quand ? t.quand.toLowerCase() : "sans échéance") + (t.manuelle ? " · ajoutée à la main" : ""))),
-    el("span", { class: "echeance" }, el("span", { class: "temps" }, restant == null ? "—" : t.retard ? "RETARD" : restant === 0 ? "JOUR J" : "J-" + restant),
-      el("span", { class: "barre " + teinte }, el("i", { style: `width:${plein}%` }))));
+    el("span", { class: "fin-mail" }, el("span", { class: "actions-mail" }, actions),
+      el("span", { class: "echeance" }, el("span", { class: "temps" }, restant == null ? "—" : t.retard ? "RETARD" : restant === 0 ? "JOUR J" : "J-" + restant),
+        el("span", { class: "barre " + teinte }, el("i", { style: `width:${plein}%` })))));
 }
 /* Cocher une tâche : la console lance le workflow « Tâche faite » du dépôt olympe, qui retire le
    libellé « À traiter » dans Gmail et ferme la tâche. En attendant la mise à jour des données
    (une à deux minutes), la tâche est retenue sur l'appareil et masquée. */
 function lireFaites() { try { return JSON.parse(localStorage.getItem("nexus-faites") || "{}"); } catch { return {}; } }
 function garderFaites(f) { try { localStorage.setItem("nexus-faites", JSON.stringify(f)); } catch {} }
+/* Modifier ou repousser une tâche : workflow « Tâche faite » avec action « modifier ». En attendant les
+   nouvelles données, la modification est gardée sur l'appareil (nexus-modifiees) et appliquée. */
+function lireModifiees() { try { return JSON.parse(localStorage.getItem("nexus-modifiees") || "{}"); } catch { return {}; } }
+function garderModifiees(m) { try { localStorage.setItem("nexus-modifiees", JSON.stringify(m)); } catch {} }
+function appliquerModifiees(d) {
+  const mods = lireModifiees();
+  for (const [id, m] of Object.entries(mods)) {
+    const t = d.hermes.taches.find((x) => x.id === id);
+    const recu = t && t.titre === m.titre && (t.echeance || "") === m.echeance;
+    if (!t || recu || Date.now() - m.t > 864e5) { delete mods[id]; continue; }
+    Object.assign(t, { titre: m.titre, echeance: m.echeance || null, quand: quandLocal(m.echeance), retard: !!m.echeance && joursEntre(m.echeance) < 0 });
+  }
+  garderModifiees(mods);
+  trierTaches(d);
+}
+async function modifierTache(t, titre, echeance, texte) {
+  titre = (titre || "").replace(/\s+/g, " ").trim().slice(0, 200) || t.titre;
+  echeance = echeance || "";
+  const avant = { titre: t.titre, echeance: t.echeance || "" };
+  if (titre === avant.titre && echeance === avant.echeance) return true;
+  const envoyer = (de, vers) => lancerTache({ email_id: t.id, action: "modifier", titre: vers.titre !== de.titre ? vers.titre : "",
+    echeance: vers.echeance !== de.echeance ? (vers.echeance || "-") : "" });
+  const garder = (v) => {
+    const mods = lireModifiees(); mods[t.id] = { ...v, t: Date.now() }; garderModifiees(mods);
+    const a = lireAjoutees(); if (a[t.id]) { a[t.id].titre = v.titre; a[t.id].echeance = v.echeance; garderAjoutees(a); }
+    Object.assign(t, { titre: v.titre, echeance: v.echeance || null, quand: quandLocal(v.echeance), retard: !!v.echeance && joursEntre(v.echeance) < 0 });
+    trierTaches(donnees);
+  };
+  try { await envoyer(avant, { titre, echeance }); }
+  catch (e) { avis(e instanceof TypeError ? "Pas de connexion. Réessaie." : e.message, true); return false; }
+  garder({ titre, echeance });
+  proposerAnnulation(texte || "Tâche modifiée : " + titre, async () => { await envoyer({ titre, echeance }, avant); garder(avant); avis("Modification annulée : " + avant.titre); });
+  rendre();
+  return true;
+}
+function repousser(t, jours) {
+  const base = t.echeance && joursEntre(t.echeance) > 0 ? new Date(t.echeance + "T12:00:00") : new Date();
+  base.setDate(base.getDate() + jours);
+  const iso = jourParis(base);
+  return modifierTache(t, t.titre, iso, "Repoussée " + (jours === 1 ? "d'un jour" : "d'une semaine") + " (" + quandLocal(iso) + ") : " + t.titre);
+}
+let edition = null;  // identifiant de la tâche en cours de modification
+function tacheChoisie() {
+  const r = ligneChoisie(), id = r && r.dataset.tache;
+  return id ? donnees.hermes.taches.find((t) => t.id === id) : null;
+}
+function ouvrirEdition(t) { edition = t.id; rendre(); const champ = document.querySelector(".edition-tache input"); if (champ) { champ.focus(); champ.select(); } }
 function appliquerFaites(d) {
   appliquerAjoutees(d);
+  appliquerModifiees(d);
   appliquerMails(d);
   const faites = lireFaites(), ids = new Set(d.hermes.taches.map((t) => t.id));
   for (const id of Object.keys(faites)) if (!ids.has(id) || Date.now() - faites[id] > 864e5) delete faites[id];
@@ -1187,10 +1283,18 @@ async function agirMail(m, action, bouton) {
     const ajoutees = lireAjoutees();
     ajoutees[m.id] = { titre: m.objet || "(sans objet)", echeance: "", cree: Date.now(), lien: m.lien, mail: m.id };
     garderAjoutees(ajoutees);
-    avis("Tâche créée : " + (m.objet || m.de));
+    proposerAnnulation("Tâche créée : " + (m.objet || m.de), () => oublierTache(m.id, m.objet || m.de));
   } else {
     const faits = lireMails(); faits[m.id] = { ...(faits[m.id] || {}), [action]: true, t: Date.now() }; garderMails(faits);
-    avis(action === "archiver" ? "Mail archivé : " + m.de : "Mail marqué comme lu : " + m.de);
+    const etaitNonLu = m.non_lu;
+    proposerAnnulation(action === "archiver" ? "Mail archivé : " + m.de : "Mail marqué comme lu : " + m.de, async () => {
+      await lancerTache({ email_id: m.id, action: action === "archiver" ? "desarchiver" : "non_lu", titre: "" }, "mail.yml");
+      const f = lireMails(); delete f[m.id]; garderMails(f);
+      if (action === "archiver") { remettre(donnees.hermes.mails, m); donnees.hermes.mails.sort((a, b) => b.date.localeCompare(a.date)); }
+      m.non_lu = etaitNonLu || action === "lu";
+      donnees.hermes.non_lus = donnees.hermes.mails.filter((x) => x.non_lu).length;
+      avis(action === "archiver" ? "Mail remis dans la boîte : " + m.de : "Mail marqué non lu : " + m.de);
+    });
   }
   const garde = selection.index;
   appliquerFaites(donnees); rendre();
@@ -1217,6 +1321,12 @@ async function lancerTache(inputs, workflow = "tache.yml") {
   if (!r.ok) throw new Error(r.status === 401 || r.status === 403 || r.status === 404
     ? "GitHub refuse le jeton : vérifie le secret NEXUS_ACTIONS_TOKEN." : "GitHub ne répond pas (" + r.status + "). Réessaie.");
 }
+async function oublierTache(id, titre) {
+  await lancerTache({ email_id: id, action: "supprimer" });
+  const a = lireAjoutees(); delete a[id]; garderAjoutees(a);
+  donnees.hermes.taches = donnees.hermes.taches.filter((t) => t.id !== id);
+  avis("Tâche retirée : " + titre);
+}
 async function ajouterTache(titre, echeance) {
   titre = (titre || "").replace(/\s+/g, " ").trim().slice(0, 200);
   if (!titre) return false;
@@ -1230,7 +1340,7 @@ async function ajouterTache(titre, echeance) {
   }
   const ajoutees = lireAjoutees(); ajoutees[id] = { titre, echeance: echeance || "", cree: Date.now() }; garderAjoutees(ajoutees);
   appliquerAjoutees(donnees);
-  avis("Tâche ajoutée : " + titre);
+  proposerAnnulation("Tâche ajoutée : " + titre, () => oublierTache(id, titre));
   rendre();
   return true;
 }
@@ -1288,11 +1398,27 @@ async function activerNotifs() {
     avis(e instanceof TypeError ? "Pas de connexion. Réessaie." : e.message || "Impossible d'activer les notifications.", true);
   }
 }
-function avis(texte, erreur) {
+function avis(texte, erreur, annulable) {
   const a = $("avis");
-  a.textContent = texte; a.classList.toggle("erreur", !!erreur); a.hidden = false;
-  clearTimeout(avis.minuteur); avis.minuteur = setTimeout(() => { a.hidden = true; }, 4200);
+  a.replaceChildren(texte);
+  if (annulable) a.append(el("button", { class: "cmd annuler", type: "button", onclick: annuler }, "ANNULER", el("kbd", null, "Ctrl Z")));
+  a.classList.toggle("erreur", !!erreur); a.hidden = false;
+  clearTimeout(avis.minuteur); avis.minuteur = setTimeout(() => { a.hidden = true; }, annulable ? 9000 : 4200);
 }
+/* Annuler la dernière action (Ctrl+Z ou bouton ANNULER, pendant une dizaine de secondes) : la console
+   lance l'action inverse (rouvrir, supprimer, désarchiver, marquer non lu, remettre l'ancienne échéance). */
+const annulation = { faire: null, t: 0 };
+function proposerAnnulation(texte, faire) { annulation.faire = faire; annulation.t = Date.now(); avis(texte, false, true); }
+async function annuler() {
+  const faire = annulation.faire;
+  if (!faire || Date.now() - annulation.t > 12000) return avis("Rien à annuler.", true);
+  annulation.faire = null;
+  $("avis").hidden = true;
+  try { await faire(); rendre(); }
+  catch (e) { avis(e instanceof TypeError ? "Pas de connexion : rien n'a été annulé." : e.message, true); }
+}
+function remettre(liste, x) { if (!liste.some((y) => y.id === x.id)) liste.push(x); }
+function trierTaches(d) { d.hermes.taches.sort((a, b) => (!a.echeance - !b.echeance) || (a.echeance || "").localeCompare(b.echeance || "")); }
 async function cocher(t, bouton) {
   if (bouton.disabled) return;
   if (!t.id) return avis("Données d'avant la mise à jour : touche ACTUALISER, puis réessaie.", true);
@@ -1301,7 +1427,12 @@ async function cocher(t, bouton) {
   try {
     await lancerTache({ email_id: t.id });
     const faites = lireFaites(); faites[t.id] = Date.now(); garderFaites(faites);
-    avis("Tâche faite : " + t.titre);
+    proposerAnnulation("Tâche faite : " + t.titre, async () => {
+      await lancerTache({ email_id: t.id, action: "rouvrir" });
+      const f = lireFaites(); delete f[t.id]; garderFaites(f);
+      remettre(donnees.hermes.taches, t); trierTaches(donnees);
+      avis("Tâche rouverte : " + t.titre);
+    });
     setTimeout(() => { appliquerFaites(donnees); rendre(); }, 700);
   } catch (e) {
     bouton.disabled = false; rangee.classList.remove("faite");
@@ -2137,6 +2268,10 @@ function preparerClavier() {
   $("bouton-focus").setAttribute("aria-pressed", String(modeFocus));
 
   addEventListener("keydown", (ev) => {
+    if ((ev.ctrlKey || ev.metaKey) && !ev.altKey && !ev.shiftKey && ev.key.toLowerCase() === "z" && !$("appli").hidden
+        && !/^(input|select|textarea)$/i.test(document.activeElement?.tagName || "") && annulation.faire) {
+      ev.preventDefault(); annuler(); return;
+    }
     if ((ev.ctrlKey || ev.metaKey) && !ev.altKey && ev.key.toLowerCase() === "k") {
       if ($("appli").hidden) return;
       ev.preventDefault();
@@ -2163,6 +2298,8 @@ function preparerClavier() {
     else if (listes && (k === "j" || k === "J" || k === "ArrowDown" && selection.index >= 0)) choisirLigne(selection.index + 1);
     else if (listes && (k === "k" || k === "K" || k === "ArrowUp" && selection.index >= 0)) choisirLigne(selection.index < 0 ? 0 : selection.index - 1);
     else if (listes && (k === "x" || k === "X")) cocherChoisie();
+    else if (listes && (k === "p" || k === "P")) { const t = tacheChoisie(); t ? repousser(t, ev.shiftKey ? 7 : 1) : avis("Choisis d'abord une tâche avec J ou K.", true); }
+    else if (listes && (k === "m" || k === "M")) { const t = tacheChoisie(); t ? ouvrirEdition(t) : avis("Choisis d'abord une tâche avec J ou K.", true); }
     else if (listes && (k === "a" || k === "A")) agirMailChoisi("tache");
     else if (listes && (k === "u" || k === "U")) agirMailChoisi("lu");
     else if (listes && (k === "e" || k === "E")) agirMailChoisi("archiver");
@@ -2199,6 +2336,7 @@ async function ouvrir(d) {
 }
 async function demarrer() {
   setInterval(horloge, 10000);
+  setInterval(majPastilleEtTitre, 60000);
   reacteur($("reacteur-verrou"));
   requestAnimationFrame(boucle);
   if (DEMO) { $("verrouiller").hidden = true; return ouvrir(DEMO); }
